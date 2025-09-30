@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | Control de Flota y Personal</title>
+    <link rel="stylesheet" href="styles.css"> </head>
+<body>
+    <header>
+        <h1>Control de Flota y Personal | Dashboard MAC Seguridad</h1>
+    </header>
+
+    <main>
+        <section class="controls">
+            <div class="tabs-container">
+                <button class="tab-button active" data-sheet="Verificacion de Baterias/Patrullas">Verificación B/P</button>
+                <button class="tab-button" data-sheet="Verificacion de objetivos MAC">Verificación MAC</button>
+                <button class="tab-button" data-sheet="Verificacion de sitios Aysa">Verificación AYSA</button>
+                <button class="tab-button" data-sheet="verificacion de bases">Verificación BASES</button>
+            </div>
+            
+            <div class="filter-bar">
+                <input type="text" id="searchInput" placeholder="Buscar por Puesto, Dominio, o Vigilador...">
+                <select id="alertFilter">
+                    <option value="all">Mostrar Todos</option>
+                    <option value="alerts">🚨 Mostrar Solo Alertas</option>
+                </select>
+            </div>
+        </section>
+
+        <section class="summary">
+            <h2>Información Resumida</h2>
+            <div id="supervisorSummary" class="summary-box">
+                <p>Cargando sumario...</p>
+            </div>
+        </section>
+
+        <section class="data-display">
+            <h2>Resultados del Chequeo (<span id="countDisplay">0</span>)</h2>
+            <div id="dataContainer" class="responsive-data">
+                </div>
+        </section>
+        
+        <div id="detailsModal" class="modal">
+            <div class="modal-content">
+                <span class="close-button">&times;</span>
+                <h3>Detalles del Chequeo</h3>
+                <div id="modalBody"></div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 MacSeguridad Control.</p>
+    </footer>
+
+    <script src="script.js"></script> </body>
+</html>
