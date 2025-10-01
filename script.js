@@ -20,41 +20,51 @@ const closeModal = document.querySelector('.close-button');
 const tabButtons = document.querySelectorAll('.tab-button');
 const supervisorSummary = document.getElementById('supervisorSummary');
 
-// Función auxiliar para forzar la conversión de fecha de 'DD/MM/AAAA' a 'MM/DD/AAAA'
-const normalizeDateForParsing = (timestampString) => {
-    if (!timestampString) return null;
+// Función auxiliar para obtener un valor numérico comparable basado en la fecha y hora.
+const getDateSortValue = (timestampString) => {
+    if (!timestampString) return 0; // Valor cero para los nulos (irán al inicio)
 
-    // 1. Intentar encontrar el patrón de fecha DD/MM/AAAA.
-    // Ej: "19/9/2025, 2:45:18 p.m."
+    // Formato de Apps Script: "DD/MM/AAAA, HH:MM:SS p.m." (ej. 19/9/2025, 2:45:18 p.m.)
     
-    // Separamos la fecha de la hora (la hora puede tener a.m./p.m. o ser 24h)
-    const [datePart, timePart] = timestampString.split(/[,\s]/, 2); // Divide por coma o espacio
+    // 1. Separar la fecha y la hora
+    const [datePart, timePart] = timestampString.split(', ');
+    if (!datePart || !timePart) return 0; // Fallback si el formato no es el esperado
 
-    if (!datePart) return null;
-
-    // 2. Extraer partes de la fecha (Día/Mes/Año)
+    // 2. Obtener partes de la fecha (DD, MM, AAAA)
     const dateParts = datePart.split('/');
-    if (dateParts.length !== 3) {
-        // Si no se encuentra el formato D/M/A, devolvemos el original para un intento simple
-        return timestampString; 
+    if (dateParts.length !== 3) return 0;
+
+    const day = dateParts[0].padStart(2, '0'); // 19 -> "19"
+    const month = dateParts[1].padStart(2, '0'); // 9 -> "09"
+    const year = dateParts[2]; // 2025
+
+    // 3. Obtener partes de la hora y convertir a 24 horas (HH, MM, SS)
+    const [hms, ampm] = timePart.split(' ');
+    const [rawHour, minute, second] = hms.split(':');
+    let hour = parseInt(rawHour);
+
+    // Conversión a formato 24 horas
+    if (ampm && ampm.toLowerCase() === 'p.m.' && hour !== 12) {
+        hour += 12;
+    } else if (ampm && ampm.toLowerCase() === 'a.m.' && hour === 12) {
+        hour = 0; // Medianoche (12:xx:xx a.m.)
     }
     
-    // 3. Reordenar de DD/MM/AAAA a MM/DD/AAAA (formato americano seguro para new Date())
-    // Y concatenar con el resto de la cadena de tiempo.
-    const month = dateParts[1].trim();
-    const day = dateParts[0].trim();
-    const year = dateParts[2].trim();
+    // Formatear la hora a dos dígitos
+    const formattedHour = String(hour).padStart(2, '0');
+    const formattedMinute = minute.padStart(2, '0');
+    const formattedSecond = second.padStart(2, '0');
+
+    // 4. Crear una cadena de número largo: AAAAMMDDHHMMSS
+    // Este número es comparable directamente. El más grande es el más reciente.
+    const sortValue = `${year}${month}${day}${formattedHour}${formattedMinute}${formattedSecond}`;
     
-    // Si hay una parte de tiempo, la concatenamos
-    const normalizedTime = timestampString.substring(datePart.length).trim();
-    
-    return `${month}/${day}/${year}${normalizedTime}`; 
+    // Devolvemos el valor como un número entero para la comparación
+    return parseInt(sortValue, 10);
 };
 
-/**
- * Carga los datos de la API de Google Apps Script para una hoja específica y los ordena.
- */
 const loadData = async (sheetName) => {
+    // ... (El inicio de loadData es igual)
     currentSheet = sheetName;
     dataContainer.innerHTML = `<p class="loading-message">Cargando datos de **${sheetName}**, por favor espere...</p>`;
     supervisorSummary.innerHTML = '<p>Cargando sumario...</p>';
@@ -63,10 +73,7 @@ const loadData = async (sheetName) => {
 
     try {
         const response = await fetch(fullUrl);
-        
-        if (!response.ok) {
-            throw new Error(`Error HTTP ${response.status}: No se pudo acceder a la API.`);
-        }
+        // ... (Manejo de errores HTTP y JSON es igual)
         
         const data = await response.json();
 
@@ -77,18 +84,14 @@ const loadData = async (sheetName) => {
         sheetData = data; 
         
         // =========================================================================
-        // 🚀 LÓGICA DE ORDENAMIENTO USANDO EL PARSEO
+        // 🚀 LÓGICA DE ORDENAMIENTO MANUAL POR NÚMERO
         // =========================================================================
         sheetData.sort((a, b) => {
-            // Se normaliza la cadena y luego se convierte a Date
-            const normalizedA = normalizeDateForParsing(a.timestamp);
-            const normalizedB = normalizeDateForParsing(b.timestamp);
+            const sortValueA = getDateSortValue(a.timestamp); 
+            const sortValueB = getDateSortValue(b.timestamp);
             
-            const dateA = normalizedA ? new Date(normalizedA) : new Date(0); 
-            const dateB = normalizedB ? new Date(normalizedB) : new Date(0);
-            
-            // Orden descendente (B - A): Más reciente primero
-            return dateB.getTime() - dateA.getTime();
+            // Orden descendente (B - A): El número más grande (más reciente) va primero.
+            return sortValueB - sortValueA;
         });
         // =========================================================================
 
