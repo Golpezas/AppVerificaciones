@@ -20,8 +20,39 @@ const closeModal = document.querySelector('.close-button');
 const tabButtons = document.querySelectorAll('.tab-button');
 const supervisorSummary = document.getElementById('supervisorSummary');
 
+// Función auxiliar para forzar la conversión de fecha de 'DD/MM/AAAA' a 'MM/DD/AAAA'
+const normalizeDateForParsing = (timestampString) => {
+    if (!timestampString) return null;
+
+    // 1. Intentar encontrar el patrón de fecha DD/MM/AAAA.
+    // Ej: "19/9/2025, 2:45:18 p.m."
+    
+    // Separamos la fecha de la hora (la hora puede tener a.m./p.m. o ser 24h)
+    const [datePart, timePart] = timestampString.split(/[,\s]/, 2); // Divide por coma o espacio
+
+    if (!datePart) return null;
+
+    // 2. Extraer partes de la fecha (Día/Mes/Año)
+    const dateParts = datePart.split('/');
+    if (dateParts.length !== 3) {
+        // Si no se encuentra el formato D/M/A, devolvemos el original para un intento simple
+        return timestampString; 
+    }
+    
+    // 3. Reordenar de DD/MM/AAAA a MM/DD/AAAA (formato americano seguro para new Date())
+    // Y concatenar con el resto de la cadena de tiempo.
+    const month = dateParts[1].trim();
+    const day = dateParts[0].trim();
+    const year = dateParts[2].trim();
+    
+    // Si hay una parte de tiempo, la concatenamos
+    const normalizedTime = timestampString.substring(datePart.length).trim();
+    
+    return `${month}/${day}/${year}${normalizedTime}`; 
+};
+
 /**
- * Carga los datos de la API de Google Apps Script para una hoja específica.
+ * Carga los datos de la API de Google Apps Script para una hoja específica y los ordena.
  */
 const loadData = async (sheetName) => {
     currentSheet = sheetName;
@@ -44,11 +75,29 @@ const loadData = async (sheetName) => {
         }
         
         sheetData = data; 
+        
+        // =========================================================================
+        // 🚀 LÓGICA DE ORDENAMIENTO USANDO EL PARSEO
+        // =========================================================================
+        sheetData.sort((a, b) => {
+            // Se normaliza la cadena y luego se convierte a Date
+            const normalizedA = normalizeDateForParsing(a.timestamp);
+            const normalizedB = normalizeDateForParsing(b.timestamp);
+            
+            const dateA = normalizedA ? new Date(normalizedA) : new Date(0); 
+            const dateB = normalizedB ? new Date(normalizedB) : new Date(0);
+            
+            // Orden descendente (B - A): Más reciente primero
+            return dateB.getTime() - dateA.getTime();
+        });
+        // =========================================================================
+
         sheetData = checkInactivity(sheetData); 
         updateSummaryData(sheetData); 
         filterAndSearch(); 
         
     } catch (error) {
+        // ... (Manejo de errores sigue igual)
         console.error("Fallo al obtener los datos:", error);
         const displayError = error.message.includes('split is not function') ? 
                              "Error de formato de datos (v.nombre o supervisor vacío/nulo). Revise el backend." : 
