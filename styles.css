@@ -295,6 +295,56 @@ main {
     border-radius: 4px;
 }
 
+/* Estilos para el nuevo panel de Recorrido */
+.recorrido-display {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 2px solid #ccc;
+}
+.recorrido-box {
+    background-color: #f7f7f7;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.recorrido-day-card {
+    margin-bottom: 15px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    overflow: hidden;
+}
+.recorrido-day-card .card-header {
+    background-color: #007bff; /* Color primario */
+    color: white;
+    padding: 10px 15px;
+}
+.recorrido-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    border-bottom: 1px solid #eee;
+}
+.item-alert {
+    background-color: #fff3cd; /* Amarillo claro */
+}
+.btn-detail {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+.item-alert .btn-detail {
+    background: #dc3545; /* Rojo para las alertas */
+}
+.item-time {
+    font-weight: bold;
+    min-width: 120px;
+}
+
 /* ======================== MEDIA QUERIES (RESPONSIVE) ======================== */
 
 /* Ocultar cards en escritorio */
@@ -317,3 +367,4 @@ main {
         min-width: 100%;
     }
 }
+
