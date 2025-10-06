@@ -106,6 +106,33 @@ main {
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
+.supervisor-list {
+    list-style: none;
+    padding: 0;
+}
+
+.supervisor-list li {
+    padding: 8px 12px;
+    margin-bottom: 4px;
+    background-color: #070f16; /* Color de fondo suave */
+    border: 1px solid #dee2e6;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+.supervisor-list li:hover {
+    background-color: #e9ecef; /* Oscurece al pasar el ratón */
+}
+
+/* Estilo para el supervisor actualmente seleccionado */
+.supervisor-list li.active-supervisor {
+    background-color: #007bff; /* Color primario */
+    color: rgb(12, 11, 11);
+    border-color: #0056b3;
+    font-weight: bold;
+}
+
 #supervisorSummary h4 {
     margin-bottom: 10px;
     color: #333;

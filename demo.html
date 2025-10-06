@@ -3,23 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DEMO | Verificación de Bases</title>
+    <title>DEMO | Control de Flota y Objetivos</title> 
     <link rel="stylesheet" href="styles.css"> 
-    <style>
-        /* Ocultamos los botones de las pestañas que no son de Base */
-        .tabs-container button:not([data-sheet="verificacion de bases"]) {
-            display: none !important;
-        }
-        /* Ajustamos el nombre de la pestaña de Base para la demo */
-        .tabs-container button[data-sheet="verificacion de bases"] {
-            pointer-events: none; /* Desactivamos el clic en la única pestaña visible */
-            cursor: default;
-        }
-    </style>
 </head>
 <body>
     <header>
-        <h1>DEMO | Dashboard: Verificación de Bases</h1>
+        <h1>DEMO | Dashboard: Baterías/Patrullas y Objetivos MAC</h1> 
     </header>
 
     <main>
@@ -27,32 +16,29 @@
             <div class="tabs-container">
                 <button class="tab-button active" data-sheet="Verificacion de Baterias/Patrullas">Verificación B/P</button>
                 <button class="tab-button" data-sheet="Verificacion de objetivos MAC">Verificación MAC</button>
-                <button class="tab-button" data-sheet="Verificacion de sitios Aysa">Verificación AYSA</button>
-                <button class="tab-button" data-sheet="verificacion de bases">Verificación BASES</button>
-            </div>
+                
+                </div>
             
             <div class="filter-bar">
-                <input type="text" id="searchInput" placeholder="Buscar por Dominio, o Base...">
+                <input type="text" id="searchInput" placeholder="Buscar por Puesto, Dominio, o Vigilador...">
                 <select id="alertFilter">
                     <option value="all">Mostrar Todos</option>
                     <option value="alerts">🚨 Mostrar Solo Alertas</option>
                 </select>
-                </div>
-        </section>
-
-        <section class="summary">
-            <h2>Información Resumida</h2>
-            <div id="supervisorSummary" class="summary-box">
-                <p>Cargando sumario...</p>
             </div>
         </section>
 
+        <div class="summary-section">
+            <div id="supervisorSummary" class="supervisor-summary-list">
+                </div>
+        </div>
+        
         <section class="data-display">
             <h2>Resultados del Chequeo (<span id="countDisplay">0</span>)</h2>
             <div id="dataContainer" class="responsive-data">
                 </div>
         </section>
-        
+
         <div id="detailsModal" class="modal">
             <div class="modal-content">
                 <span class="close-button">&times;</span>
@@ -66,21 +52,6 @@
         <p>&copy; 2025 MacSeguridad Control.</p>
     </footer>
 
-    <script src="script.js"></script>
-    <script>
-        // Forzamos la carga de la pestaña de bases y deshabilitamos la inicialización original de pestañas.
-        document.addEventListener('DOMContentLoaded', () => {
-            // Aseguramos que solo el botón de bases esté activo
-            document.querySelector('.tab-button[data-sheet="verificacion de bases"]').classList.add('active');
-            
-            // Reemplazamos el inicio de initialize() con la carga directa:
-            loadData('verificacion de bases'); 
-            
-            // Aquí debes asegurar que los listeners de búsqueda se añadan, si initialize() no los añade
-            // document.getElementById('searchInput').addEventListener('keyup', filterAndSearch);
-            // document.getElementById('alertFilter').addEventListener('change', filterAndSearch);
-            // (Si tu script.js maneja la adición de eventos al final, esto es suficiente)
-        });
-    </script>
+    <script src="script.js"></script> 
     </body>
 </html>

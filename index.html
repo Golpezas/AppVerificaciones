@@ -28,12 +28,26 @@
             </div>
         </section>
 
-        <section class="summary">
-            <h2>Información Resumida</h2>
-            <div id="supervisorSummary" class="summary-box">
-                <p>Cargando sumario...</p>
+        <div class="summary-section">
+    
+            <div class="recorrido-date-control">
+                <label for="recorridoDateSelector">Ver Recorrido en Fecha:</label>
+                <input type="date" id="recorridoDateSelector" class="form-control"> 
             </div>
-        </section>
+    
+            <div id="supervisorSummary" class="supervisor-summary-list">
+            </div>
+
+            <div class="recorrido-detail-container">
+                <h2>Ruta de Chequeos del Supervisor</h2>
+                    <p id="recorridoInstructions">Selecciona un supervisor del sumario para ver su recorrido.</p>
+                <div id="recorridoContainer" class="recorrido-grid">
+                </div>
+            </div>
+        </div>
+
+        <div class="data-table-section">
+            </div>
 
         <section class="data-display">
             <h2>Resultados del Chequeo (<span id="countDisplay">0</span>)</h2>
@@ -41,13 +55,6 @@
                 </div>
         </section>
 
-        <section class="recorrido-display">
-            <h2>Recorrido Detallado del Supervisor</h2>
-            <p id="recorridoInstructions" class="instructions-text">Haz clic en una fila de la tabla para ver el recorrido completo de ese supervisor.</p>
-            <div id="recorridoContainer" class="recorrido-box">
-                </div>
-        </section>
-        
         <div id="detailsModal" class="modal">
             <div class="modal-content">
                 <span class="close-button">&times;</span>

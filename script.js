@@ -3,13 +3,12 @@
 // ====================================================================================================
 
 // 🛑 ¡PUNTO CRÍTICO! REEMPLAZA ESTA URL CON LA DE TU PROPIO DESPLIEGUE. 
-// SI ESTA URL ES INCORRECTA O ESTÁ MAL DESPLEGADA, NINGÚN DATO SE MOSTRARÁ.
 const API_URL = 'https://script.google.com/macros/s/AKfycbzDjq01yI157yqVUnRddgOrZS0Y7i2Vsdq23CD39lqoF6cHTNDiFYerxYRqXo2vE2Uysw/exec'; 
 
-let currentSheet = "Verificacion de Baterias/Patrullas"; // Pestaña activa inicial
-let sheetData = []; // La data cargada de la hoja activa
+let currentSheet = "Verificacion de Baterias/Patrullas"; 
+let sheetData = []; 
 
-// Referencias del DOM (Se verifica si existen al inicio para evitar errores)
+// Referencias del DOM
 const dataContainer = document.getElementById('dataContainer');
 const searchInput = document.getElementById('searchInput');
 const alertFilter = document.getElementById('alertFilter');
@@ -18,78 +17,97 @@ const detailsModal = document.getElementById('detailsModal');
 const modalBody = document.getElementById('modalBody');
 const closeModal = document.querySelector('.close-button');
 const tabButtons = document.querySelectorAll('.tab-button');
-const supervisorSummary = document.getElementById('supervisorSummary');
 
-// Referencias del DOM para el Recorrido
+// Referencias del DOM para el SUMARIO y RECORRIDO
+const supervisorSummary = document.getElementById('supervisorSummary');
 const recorridoContainer = document.getElementById('recorridoContainer');
 const recorridoInstructions = document.getElementById('recorridoInstructions');
+const resultsTitle = document.getElementById('resultsTitle'); 
+const recorridoDateSelector = document.getElementById('recorridoDateSelector');
 
 
 // ====================================================================================================
-// 2. FUNCIONES DE CARGA Y ORDENAMIENTO
+// 2. FUNCIONES DE CARGA Y ORDENAMIENTO (Corregidas para la hora local)
 // ====================================================================================================
 
 /**
- * Función auxiliar que convierte la fecha del formato DD/MM/AAAA a MM/DD/AAAA
- * para que el constructor new Date() la interprete correctamente.
+ * Función auxiliar para obtener un valor numérico (milisegundos) comparable basado en la fecha y hora.
+ * CRÍTICO: Utiliza el constructor local para mitigar el problema de desfase de zona horaria.
  */
-const normalizeDateForParsing = (timestampString) => {
-    if (!timestampString) return null;
-
-    const parts = timestampString.split(', ');
-    if (parts.length < 2) return timestampString;
-
-    const datePart = parts[0].trim();
-    const timePart = parts[1].trim();
-    
-    const dateParts = datePart.split('/');
-    if (dateParts.length !== 3) return timestampString;
-    
-    const month = dateParts[1].trim();
-    const day = dateParts[0].trim();
-    const year = dateParts[2].trim();
-    
-    return `${month}/${day}/${year} ${timePart}`; 
-};
-
-// Función auxiliar para obtener un valor numérico comparable basado en la fecha y hora.
 const getDateSortValue = (timestampString) => {
-    const normalizedDateString = normalizeDateForParsing(timestampString);
-    if (!normalizedDateString) return 0;
+    if (!timestampString) return 0;
+
+    // Formato: "DD/MM/AAAA, HH:MM:SS p.m."
     
-    const dateObj = new Date(normalizedDateString);
-    if (isNaN(dateObj)) return 0;
+    const [datePartWithSpaces, timePartWithSpaces] = timestampString.split(', ');
+    
+    let datePart = datePartWithSpaces ? datePartWithSpaces.trim() : null;
+    let timePart = timePartWithSpaces ? timePartWithSpaces.trim() : null;
+    
+    if (!datePart || !timePart) {
+         // Intenta el formato sin coma si falla el primero
+         const parts = timestampString.trim().split(' ');
+         if (parts.length >= 2) {
+             timePart = parts.pop();
+             datePart = parts.join(' ');
+         } else {
+             return 0;
+         }
+    }
+    
+    // 1. Obtener partes de la fecha (DD, MM, AAAA)
+    const dateParts = datePart.split('/');
+    if (dateParts.length !== 3) return 0;
 
-    // Generar un número de ordenamiento YYYYMMDDHHMMSS
-    const year = dateObj.getFullYear();
-    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const day = String(dateObj.getDate()).padStart(2, '0');
-    const hours = String(dateObj.getHours()).padStart(2, '0');
-    const minutes = String(dateObj.getMinutes()).padStart(2, '0');
-    const seconds = String(dateObj.getSeconds()).padStart(2, '0');
+    const day = parseInt(dateParts[0]);
+    const monthIndex = parseInt(dateParts[1]) - 1; // 0-indexado (Enero = 0)
+    const year = parseInt(dateParts[2]);
 
-    return parseInt(`${year}${month}${day}${hours}${minutes}${seconds}`, 10);
+    // 2. Obtener partes de la hora y convertir a 24 horas (HH, MM, SS)
+    const timeElements = timePart.split(' ');
+    const hms = timeElements[0];
+    const ampm = timeElements.length > 1 ? timeElements[1] : '';
+
+    const [rawHour, minute, second] = hms.split(':').map(n => parseInt(n));
+    if (isNaN(rawHour) || isNaN(minute) || isNaN(second)) return 0;
+    
+    let hour = rawHour;
+
+    // Conversión a formato 24 horas
+    if (ampm && ampm.toLowerCase() === 'p.m.' && hour !== 12) {
+        hour += 12;
+    } else if (ampm && ampm.toLowerCase() === 'a.m.' && hour === 12) {
+        hour = 0; // Medianoche (12:xx:xx a.m.)
+    }
+    
+    // Construcción: Usamos el constructor local (Year, MonthIndex, Day, Hour, Minute, Second)
+    const dateObj = new Date(year, monthIndex, day, hour, minute, second);
+
+    // Devolvemos el valor numérico (milisegundos) para la comparación
+    return isNaN(dateObj.getTime()) ? 0 : dateObj.getTime();
 };
 
 
 const loadData = async (sheetName) => {
     currentSheet = sheetName;
     
+    // 1. Limpieza y mensajes de carga
     if (dataContainer) {
         dataContainer.innerHTML = `<p class="loading-message">Cargando datos de **${sheetName}**, por favor espere...</p>`;
     }
     if (supervisorSummary) {
         supervisorSummary.innerHTML = '<p>Cargando sumario...</p>';
     }
-    // Limpiar recorrido al cambiar de pestaña
+    // Restablecer el recorrido
     if (recorridoContainer && recorridoInstructions) {
         recorridoContainer.innerHTML = ''; 
-        recorridoInstructions.textContent = 'Haz clic en una fila de la tabla para ver el recorrido completo de ese supervisor.';
+        recorridoInstructions.textContent = 'Selecciona un supervisor del sumario para ver su recorrido.';
     }
     
     const fullUrl = `${API_URL}?sheet=${encodeURIComponent(sheetName)}`;
 
     try {
+        // 2. Obtener datos
         const response = await fetch(fullUrl);
         const data = await response.json();
 
@@ -99,16 +117,17 @@ const loadData = async (sheetName) => {
         
         sheetData = data; 
         
-        // 🚀 LÓGICA DE ORDENAMIENTO MANUAL POR FECHA (Más Reciente a Más Antiguo)
+        // 🚀 CRÍTICO: Ordenamiento DESCENDENTE (Más Reciente a Más Antiguo)
         sheetData.sort((a, b) => {
             const sortValueA = getDateSortValue(a.timestamp); 
             const sortValueB = getDateSortValue(b.timestamp);
-            return sortValueB - sortValueA;
+            return sortValueB - sortValueA; // B - A para DESCENDENTE
         });
 
+        // 4. Actualizar UI
         sheetData = checkInactivity(sheetData); 
         updateSummaryData(sheetData); 
-        filterAndSearch(); 
+        window.filterAndSearch(); // Muestra la tabla principal (ya ordenada) o aplica filtros
         
     } catch (error) {
         console.error("Fallo al obtener los datos:", error);
@@ -121,7 +140,7 @@ const loadData = async (sheetName) => {
 };
 
 // ====================================================================================================
-// 3. LÓGICA DE NEGOCIO Y ALERTAS (Las funciones hasAlert, checkCombustible, etc. se mantienen igual)
+// 3. LÓGICA DE NEGOCIO Y ALERTAS (hasAlert Corregida para capacitación)
 // ====================================================================================================
 
 const checkCombustible = (fraccion) => {
@@ -190,6 +209,7 @@ const hasAlert = (item) => {
     
     if (item.vigiladores && item.vigiladores.length > 0) {
         const vigiladorAlerta = item.vigiladores.some(v => 
+            // 🚨 CORRECCIÓN: La capacitación NO genera la alerta principal.
             isNegative(v.uniformeCompleto) || 
             isNegative(v.regControlado)
         );
@@ -214,18 +234,17 @@ const checkInactivity = (data) => {
         }
     });
 
-    const now = new Date().getTime();
+    const now = Date.now();
     const twentyFourHours = 24 * 60 * 60 * 1000;
     
     return data.map((item) => {
         const key = item.patrullaNombre;
         const lastReport = lastReports[key];
         
-        const lastReportDate = lastReport && lastReport.timestamp ? new Date(normalizeDateForParsing(lastReport.timestamp)).getTime() : 0;
+        const lastReportDateMilli = lastReport ? lastReport.sortValue : 0; 
 
-        const hasPassedThreshold = lastReportDate === 0 || (now - lastReportDate) > twentyFourHours;
+        const hasPassedThreshold = lastReportDateMilli === 0 || (now - lastReportDateMilli) > twentyFourHours;
         
-        // Solo la última fila (la más reciente) debe tener la alerta de inactividad
         const isLatestReport = item.timestamp && getDateSortValue(item.timestamp) === lastReport.sortValue;
         
         item.inactividadAlerta = isLatestReport && hasPassedThreshold;
@@ -235,21 +254,24 @@ const checkInactivity = (data) => {
 };
 
 const updateSummaryData = (data) => {
-    // ... (La lógica de updateSummaryData se mantiene igual)
     const supervisorCounts = {};
     
     data.filter(item => item.emailSupervisor).forEach(item => {
-        const key = item.emailSupervisor || 'Sin Supervisor';
+        const key = item.emailSupervisor.trim().toLowerCase(); 
         supervisorCounts[key] = (supervisorCounts[key] || 0) + 1;
     });
 
-    let html = '<h4>Objetivos Recorridos por Supervisor:</h4><ul>';
+    let html = '<h4>Supervisores y Cantidad de Informes:</h4><ul class="supervisor-list">';
     const sortedSupervisors = Object.entries(supervisorCounts).sort(([, a], [, b]) => b - a);
 
     if (sortedSupervisors.length > 0) {
-        sortedSupervisors.forEach(([supervisor, count]) => {
-            const displaySupervisor = supervisor.includes('@') ? supervisor.split('@')[0] : supervisor; 
-            html += `<li><strong>${displaySupervisor}</strong>: ${count} chequeos</li>`;
+        sortedSupervisors.forEach(([supervisorEmail, count]) => {
+            const displaySupervisor = supervisorEmail.includes('@') ? supervisorEmail.split('@')[0] : supervisorEmail; 
+            
+            html += `<li onclick="window.showSupervisorRecorrido('${supervisorEmail}')" data-email="${supervisorEmail}">
+                        <span class="supervisor-name">${displaySupervisor}</span>: 
+                        <span class="report-count">${count} chequeos</span>
+                     </li>`;
         });
     } else {
         html = '<p>No hay registros válidos de supervisores en esta hoja.</p>';
@@ -261,37 +283,42 @@ const updateSummaryData = (data) => {
 
 
 // ====================================================================================================
-// 4. LÓGICA DE RECORRIDO (Aseguramos que el acceso a DOM sea seguro)
+// 4. LÓGICA DE RECORRIDO Y FILTRO DE FECHA (groupRecorridoByDay Corregido para la hora local)
 // ====================================================================================================
 
 /**
  * Agrupa las verificaciones de un supervisor por día y asegura el orden cronológico.
+ * CORREGIDO: Usa métodos locales para evitar el desfase de zona horaria al crear la clave del día.
  */
 const groupRecorridoByDay = (data) => {
     const dailyRecorrido = {};
 
     data.forEach(item => {
-        const normalizedDate = normalizeDateForParsing(item.timestamp);
-        if (!normalizedDate) return;
+        const sortValue = getDateSortValue(item.timestamp);
+        if (sortValue === 0) return;
 
-        const dateObj = new Date(normalizedDate);
+        const dateObj = new Date(sortValue); 
         
-        // Formato para la clave de agrupación: YYYY-MM-DD
-        const dayKey = dateObj.toISOString().split('T')[0];
+        // 🚨 CRÍTICO: Usamos métodos locales para generar la clave YYYY-MM-DD
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        
+        const dayKey = `${year}-${month}-${day}`; // Clave YYYY-MM-DD
 
         if (!dailyRecorrido[dayKey]) {
             dailyRecorrido[dayKey] = [];
         }
-        
         dailyRecorrido[dayKey].push(item);
     });
 
-    // Asegurarse de que los chequeos dentro de cada día estén ordenados por hora (el más antiguo primero)
+    // Ordena los chequeos DENTRO de cada día (Ascendente por hora)
     for (const day in dailyRecorrido) {
         dailyRecorrido[day].sort((a, b) => {
-            const timeA = new Date(normalizeDateForParsing(a.timestamp)).getTime();
-            const timeB = new Date(normalizeDateForParsing(b.timestamp)).getTime();
-            return timeA - timeB; 
+            const timeA = getDateSortValue(a.timestamp);
+            const timeB = getDateSortValue(b.timestamp);
+            
+            return timeA - timeB; // Ascendente (A - B)
         });
     }
 
@@ -299,206 +326,141 @@ const groupRecorridoByDay = (data) => {
 };
 
 /**
- * Muestra el recorrido del supervisor seleccionado.
+ * Genera el nombre de la ubicación relevante según la pestaña activa.
  */
-window.showSupervisorRecorrido = (emailSupervisor) => {
-    if (!recorridoContainer || !recorridoInstructions) {
-         console.warn("Error: recorridoContainer o recorridoInstructions no están definidos. ¿Faltan IDs en el HTML?");
-         return;
+const getDisplayLocation = (check, currentSheet) => {
+    const locationName = check.patrullaNombre || 'Ubicación Desconocida';
+    const movilDominio = check.movilDominio || '';
+    
+    switch (currentSheet) {
+        
+        case "Verificacion de Baterias/Patrullas":
+            if (movilDominio && movilDominio.trim().toUpperCase() !== 'N/A' && locationName !== 'Ubicación Desconocida') {
+                 return `${movilDominio} - ${locationName}`;
+            }
+            return locationName;
+            
+        case "Verificacion de objetivos MAC":
+        case "Verificacion de sitios Aysa": 
+            return locationName; 
+
+        case "verificacion de bases":
+             return `${locationName} - Base Fija`;
+             
+        default:
+             return `${locationName} ${movilDominio ? '- ' + movilDominio : ''}`;
     }
+};
 
-    // 1. Filtrar los datos globales por el supervisor
-    const supervisorData = sheetData.filter(item => item.emailSupervisor === emailSupervisor);
+/**
+ * Función que renderiza el HTML del recorrido para un día específico.
+ * Nota: El objeto 'check' se pasa al modal via JSON encoding/decoding.
+ */
+const renderRecorridoForDate = (dayISO, supervisorName, dailyRecorrido) => {
+    if (!recorridoContainer) return;
+    
+    const checks = dailyRecorrido[dayISO]; 
+    
+    const availableDays = Object.keys(dailyRecorrido).sort().reverse(); 
 
-    if (supervisorData.length === 0) {
-        recorridoContainer.innerHTML = `<p class="text-danger">No se encontraron chequeos para ${emailSupervisor}.</p>`;
-        recorridoInstructions.innerHTML = `<p>Recorrido de: <strong>${emailSupervisor}</strong></p>`;
+    if (!checks || checks.length === 0) {
+        let availableDaysHtml = availableDays.length > 0 
+            ? `<p><strong>Días con chequeos:</strong> ${availableDays.map(d => {
+                 const dateParts = d.split('-'); 
+                 return `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`; 
+              }).join(', ')}</p>`
+            : `<p>Este supervisor no tiene chequeos registrados.</p>`;
+            
+        recorridoContainer.innerHTML = `<div class="card p-3 text-center">
+                                            <h4>No hay chequeos registrados el ${dayISO}</h4>
+                                            <p>Selecciona otra fecha o supervisor.</p>
+                                            ${availableDaysHtml}
+                                        </div>`;
         return;
     }
 
-    // 2. Agrupar por día y ordenar
-    const dailyRecorrido = groupRecorridoByDay(supervisorData);
-
-    // 3. Renderizar el HTML
     let html = '';
-    const sortedDays = Object.keys(dailyRecorrido).sort().reverse(); 
+    
+    const dayCheck = checks[0].timestamp ? checks[0].timestamp.split(',')[0].trim() : dayISO; 
+    
+    html += `<div class="card recorrido-day-card">
+                <div class="card-header">Día: <strong>${dayCheck}</strong> (${checks.length} Chequeos)</div>
+                <ul class="list-group list-group-flush">`;
+
+    checks.forEach((check) => {
+        
+        const timePart = check.timestamp ? check.timestamp.split(',')[1].trim() : 'N/A'; 
+        const isAlert = hasAlert(check); 
+        const checkDataString = JSON.stringify(check); 
+        
+        const displayLocation = getDisplayLocation(check, currentSheet);
+
+        html += `
+            <li class="list-group-item recorrido-item ${isAlert ? 'item-alert' : ''}">
+                <span class="item-time">[${timePart}]</span> 
+                <span class="item-location"><strong>${displayLocation}</strong></span>
+                <button class="btn-detail" 
+                        onclick="event.stopPropagation(); showDetailsModal(JSON.parse(decodeURIComponent('${encodeURIComponent(checkDataString)}')))">
+                    ${isAlert ? '🚨 Detalle' : '✅ Detalle'}
+                </button>
+            </li>
+        `;
+    });
+
+    html += `</ul></div>`;
+    recorridoContainer.innerHTML = html;
+};
+
+
+window.showSupervisorRecorrido = (emailSupervisor) => {
+    if (!recorridoContainer || !recorridoInstructions || !recorridoDateSelector) {
+         console.warn("Error: Elementos del DOM no definidos para el recorrido.");
+         return;
+    }
+    
+    const allListItems = document.querySelectorAll('.supervisor-list li');
+    allListItems.forEach(li => li.classList.remove('active-supervisor'));
+    
+    const clickedItem = document.querySelector(`.supervisor-list li[data-email="${emailSupervisor}"]`);
+    if(clickedItem) clickedItem.classList.add('active-supervisor');
+
+    recorridoDateSelector.dataset.activeSupervisor = emailSupervisor;
+
+    const supervisorData = sheetData.filter(item => 
+        item.emailSupervisor && item.emailSupervisor.trim().toLowerCase() === emailSupervisor.trim().toLowerCase()
+    );
+    
     const supervisorName = emailSupervisor.includes('@') ? emailSupervisor.split('@')[0] : emailSupervisor;
 
-    sortedDays.forEach(day => {
-        const checks = dailyRecorrido[day];
-        const displayDate = checks[0].timestamp.split(',')[0].trim(); 
+    if (supervisorData.length === 0) {
+        recorridoContainer.innerHTML = `<p class="text-danger">No se encontraron chequeos para ${supervisorName}.</p>`;
+        recorridoInstructions.innerHTML = `<p>Recorrido detallado para: <strong>${supervisorName}</strong></p>`;
+        return;
+    }
 
-        html += `<div class="card recorrido-day-card">
-                    <div class="card-header">Día: <strong>${displayDate}</strong> (${checks.length} Chequeos)</div>
-                    <ul class="list-group list-group-flush">`;
+    const dailyRecorrido = groupRecorridoByDay(supervisorData); 
 
-        checks.forEach((check) => {
-            const timePart = check.timestamp.split(',')[1].trim(); 
-            const isAlert = hasAlert(check); 
-            
-            // CORRECCIÓN CRÍTICA: Escapar el JSON para el onclick
-            // Usamos encodeURIComponent para pasar el objeto completo al modal sin problemas
-            // y luego JSON.parse(decodeURIComponent(...)) para recuperarlo
-            const checkDataString = JSON.stringify(check); 
+    recorridoDateSelector.dataset.dailyRecorrido = JSON.stringify(dailyRecorrido);
 
-            html += `
-                <li class="list-group-item recorrido-item ${isAlert ? 'item-alert' : ''}">
-                    <span class="item-time">[${timePart}]</span> 
-                    <span class="item-location">Chequeo en <strong>${check.patrullaNombre || 'Ubicación Desconocida'}</strong></span>
-                    <button class="btn-detail" 
-                            onclick="event.stopPropagation(); showDetailsModal(JSON.parse(decodeURIComponent('${encodeURIComponent(checkDataString)}')))">
-                        ${isAlert ? '🚨 Ver Faltas' : '✅ Detalle'}
-                    </button>
-                </li>
-            `;
-        });
-
-        html += `</ul></div>`;
-    });
+    const selectedDateISO = recorridoDateSelector.value; 
     
-    recorridoInstructions.innerHTML = `<p>Recorrido detallado para: <strong>${supervisorName}</strong></p>`;
-    recorridoContainer.innerHTML = html;
+    renderRecorridoForDate(selectedDateISO, supervisorName, dailyRecorrido);
 
+    recorridoInstructions.innerHTML = `<p>Recorrido detallado para: <strong>${supervisorName}</strong></p>`;
     recorridoContainer.scrollIntoView({ behavior: 'smooth' });
 };
 
 
 // ====================================================================================================
-// 5. RENDERIZADO Y BÚSQUEDA (Aseguramos que dataContainer exista)
+// 5. RENDERIZADO Y BÚSQUEDA (CORRECCIÓN CRÍTICA DE ÁMBITO Y ACCESO A DATA)
 // ====================================================================================================
 
-const getDynamicHeaders = () => {
-    // ... (La lógica de getDynamicHeaders se mantiene igual)
-     let principalHeader = '';
-    
-    switch (currentSheet) {
-        case "Verificacion de objetivos MAC":
-            principalHeader = 'Objetivo';
-            break;
-        case "Verificacion de sitios Aysa":
-            principalHeader = 'Sitio';
-            break;
-        case "verificacion de bases":
-            principalHeader = 'Base';
-            break;
-        case "Verificacion de Baterias/Patrullas":
-        default:
-            principalHeader = 'Patrulla/Batería';
-            break;
-    }
+window.filterAndSearch = () => {
+    // 🚨 Usar una copia de los datos globales YA ordenados para empezar a filtrar
+    let filteredData = [...sheetData]; 
 
-    const headers = [
-        '🚨',
-        principalHeader,
-        'Móvil/Tipo',
-        'Supervisor', 
-        'Fecha Chequeo',
-        ...((currentSheet === "Verificacion de objetivos MAC" || currentSheet === "verificacion de bases") ? [''] : ['Combustible', 'Km']), 
-        'Vigiladores (U/R)', 
-        'Detalles'
-    ];
-    
-    return headers.filter(h => h.trim() !== '');
-};
-
-const renderData = (dataToRender) => {
-    if (!dataContainer) {
-         console.warn("Error: dataContainer no está definido. ¿Falta el ID en el HTML?");
-         return;
-    }
-
-    dataContainer.innerHTML = '';
-    if (countDisplay) countDisplay.textContent = dataToRender.length;
-    
-    if (window.innerWidth > 900) {
-        renderTable(dataToRender);
-    } else {
-        renderCards(dataToRender);
-    }
-};
-
-const renderTable = (data) => {
-    // ... (renderTable se mantiene igual, verificando solo que dataContainer exista)
-    if (!dataContainer) return;
-    const headers = getDynamicHeaders();
-    const isMovilCheck = currentSheet !== "Verificacion de objetivos MAC";
-    const isBaseCheck = currentSheet === "verificacion de bases";
-
-    let tableHTML = `
-        <table class="data-table">
-            <thead>
-                <tr>
-                    ${headers.map(h => `<th>${h}</th>`).join('')}
-                </tr>
-            </thead>
-            <tbody>
-    `;
-    
-    data.forEach((item, index) => {
-        const isAlert = hasAlert(item);
-        const isInactivityAlert = item.inactividadAlerta;
-        
-        let alertClass = '';
-        // Alerta de Inactividad solo para la fila más reciente
-        if (isInactivityAlert) { 
-            alertClass = 'inactivity-alert-row';
-        } else if (isAlert) {
-            alertClass = 'alert-row';
-        }
-        
-        const statusIcon = isInactivityAlert ? '🛑' : (isAlert ? '🚨' : '✅'); 
-        
-        let vigiladoresSummary = 'N/A';
-        if (item.vigiladores && item.vigiladores.length > 0) {
-             vigiladoresSummary = item.vigiladores.map(v => {
-                const namePart = (v.nombre && typeof v.nombre === 'string') ? v.nombre.split(' ')[0] : 'Vigilador';
-                const regStatus = (v.regControlado && v.regControlado.length > 0) ? v.regControlado.substring(0,1) : '?'; 
-                const uniStatus = (v.uniformeCompleto && v.uniformeCompleto.length > 0) ? v.uniformeCompleto.substring(0,1) : '?';
-                return `${namePart} (${uniStatus}/${regStatus})`;
-            }).join('<br>');
-        }
-        
-        const combustibleDisplay = item.combustibleFraccion || 'N/A';
-        const combustibleAlertClass = isMovilCheck && !isBaseCheck && item.combustibleFraccion && checkCombustible(item.combustibleFraccion).alerta ? 'text-danger' : '';
-        
-        const supervisorDisplay = (item.emailSupervisor && typeof item.emailSupervisor === 'string') ? item.emailSupervisor.split('@')[0] : 'N/A';
-        
-        const showMovilDetails = isMovilCheck && !isBaseCheck;
-        
-        const supervisorEmail = item.emailSupervisor || 'N/A';
-
-        // 🛑 LÍNEA CRÍTICA: La fila completa llama a showSupervisorRecorrido
-        tableHTML += `
-            <tr class="${alertClass}" data-index="${index}" onclick="showSupervisorRecorrido('${supervisorEmail}')">
-                <td>${statusIcon}</td>
-                <td>${item.patrullaNombre}</td>
-                <td>${item.movilDominio || (isBaseCheck ? 'Base Fija' : 'Puesto Fijo')}</td>
-                <td>${supervisorDisplay}</td>
-                <td>${item.timestamp ? item.timestamp.split(',')[0] : 'N/A'}</td>
-                ${showMovilDetails ? `<td class="${combustibleAlertClass}">${combustibleDisplay}</td>` : ''}
-                ${showMovilDetails ? `<td>${item.kilometraje || 'N/A'}</td>` : ''}
-                <td>${vigiladoresSummary}</td>
-                <td>
-                    <button class="view-details-btn button-small" 
-                            onclick="event.stopPropagation(); showDetailsModal(sheetData[${index}])">
-                        Ver Detalle
-                    </button>
-                </td>
-            </tr>
-        `;
-    });
-    
-    tableHTML += `</tbody></table>`;
-    dataContainer.innerHTML = tableHTML;
-};
-
-// ... (renderCards se mantiene igual)
-
-const filterAndSearch = () => {
-    let filteredData = sheetData;
-    // ... (La lógica de filtro se mantiene igual)
     const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
-    const alertValue = alertFilter ? alertFilter.value : '';
+    const alertValue = alertFilter ? alertFilter.value : ''; 
     
     if (alertValue === 'alerts') {
         filteredData = filteredData.filter(item => hasAlert(item) || item.inactividadAlerta);
@@ -523,18 +485,371 @@ const filterAndSearch = () => {
             return generalMatch || puestoMatch || movilMatch || vigiladorMatch || supervisorMatch;
         });
     }
-    renderData(filteredData);
+    
+    // 🚨 Llamada corregida a la función global
+    window.renderData(filteredData);
 };
 
-// ... (showDetailsModal se mantiene igual)
+const getDynamicHeaders = () => {
+    let principalHeader = '';
+    
+    switch (currentSheet) {
+        case "Verificacion de objetivos MAC":
+            principalHeader = 'Objetivo';
+            break;
+        case "Verificacion de sitios Aysa":
+            principalHeader = 'Sitio';
+            break;
+        case "verificacion de bases":
+            principalHeader = 'Base';
+            break;
+        case "Verificacion de Baterias/Patrullas":
+        default:
+            principalHeader = 'Patrulla/Batería';
+            break;
+    }
 
-/**
- * Función que inicializa los listeners y la carga de datos.
- */
+    const headers = [
+        '🚨',
+        principalHeader,
+        'Móvil/Tipo',
+        'Supervisor', 
+        'Fecha Chequeo',
+        ...((currentSheet === "Verificacion de objetivos MAC" || currentSheet === "verificacion de bases" || currentSheet === "Verificacion de sitios Aysa") ? [''] : ['Combustible', 'Km']), 
+        'Vigiladores (U/R)', 
+        'Detalles'
+    ];
+    
+    return headers.filter(h => h.trim() !== '');
+};
+
+// 🚨 CORRECCIÓN DE ÁMBITO: renderData ahora es global (window.)
+window.renderData = (dataToRender) => {
+    if (!dataContainer) {
+         console.warn("Error: dataContainer no está definido.");
+         return;
+    }
+
+    dataContainer.innerHTML = '';
+    
+    if (countDisplay) countDisplay.textContent = dataToRender.length;
+    if (resultsTitle) resultsTitle.textContent = `Resultados del Chequeo (${dataToRender.length})`;
+
+    // Las llamadas a renderTable/renderCards no necesitan 'window.' si son declaradas antes, 
+    // pero para seguridad total las hacemos globales también.
+    if (window.innerWidth > 900) {
+        window.renderTable(dataToRender);
+    } else {
+        window.renderCards(dataToRender);
+    }
+};
+
+// 🚨 CORRECCIÓN DE ÁMBITO: renderTable ahora es global (window.)
+window.renderTable = (dataToRender) => {
+    if (!dataContainer) return;
+    const headers = getDynamicHeaders();
+    const isMovilCheck = currentSheet !== "Verificacion de objetivos MAC" && currentSheet !== "Verificacion de sitios Aysa";
+    const isBaseCheck = currentSheet === "verificacion de bases";
+
+    let tableHTML = `
+        <table class="data-table">
+            <thead>
+                <tr>
+                    ${headers.map(h => `<th>${h}</th>`).join('')}
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    dataToRender.forEach((item, index) => {
+        const isAlert = hasAlert(item);
+        const isInactivityAlert = item.inactividadAlerta;
+        
+        let alertClass = '';
+        if (isInactivityAlert) { 
+            alertClass = 'inactivity-alert-row'; // 🛑 (Alerta de Inactividad 24h)
+        } else if (isAlert) {
+            alertClass = 'alert-row'; // 🚨 (Alerta de Chequeo/Fallas)
+        }
+        
+        const statusIcon = isInactivityAlert ? '🛑' : (isAlert ? '🚨' : '✅'); 
+        
+        let vigiladoresSummary = 'N/A';
+        if (item.vigiladores && item.vigiladores.length > 0) {
+             vigiladoresSummary = item.vigiladores.map(v => {
+                const namePart = (v.nombre && typeof v.nombre === 'string') ? v.nombre.split(' ')[0] : 'Vigilador';
+                const regStatus = (v.regControlado && v.regControlado.length > 0) ? v.regControlado.substring(0,1) : '?'; 
+                const uniStatus = (v.uniformeCompleto && v.uniformeCompleto.length > 0) ? v.uniformeCompleto.substring(0,1) : '?';
+                return `${namePart} (${uniStatus}/${regStatus})`;
+            }).join('<br>');
+        }
+        
+        const combustibleDisplay = item.combustibleFraccion || 'N/A';
+        const combustibleAlertClass = isMovilCheck && !isBaseCheck && item.combustibleFraccion && checkCombustible(item.combustibleFraccion).alerta ? 'text-danger' : '';
+        
+        const supervisorDisplay = (item.emailSupervisor && typeof item.emailSupervisor === 'string') ? item.emailSupervisor.split('@')[0] : 'N/A';
+        
+        const showMovilDetails = isMovilCheck && !isBaseCheck;
+
+        // 🚨 CÓDIGO CORREGIDO: Usando JSON.stringify y decodeURIComponent para pasar el objeto
+        const itemDataString = JSON.stringify(item);
+        
+        tableHTML += `
+            <tr class="${alertClass}" data-index="${index}">
+                <td>${statusIcon}</td>
+                <td>${item.patrullaNombre}</td>
+                <td>${item.movilDominio || (isBaseCheck ? 'Base Fija' : 'Puesto Fijo')}</td>
+                <td>${supervisorDisplay}</td>
+                <td>${item.timestamp ? item.timestamp.split(',')[0] : 'N/A'}</td>
+                ${showMovilDetails ? `<td class="${combustibleAlertClass}">${combustibleDisplay}</td>` : ''}
+                ${showMovilDetails ? `<td>${item.kilometraje || 'N/A'}</td>` : ''}
+                <td>${vigiladoresSummary}</td>
+                <td>
+                    <button class="view-details-btn button-small" 
+                            onclick="event.stopPropagation(); showDetailsModal(JSON.parse(decodeURIComponent('${encodeURIComponent(itemDataString)}')))">
+                        Ver Detalle
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    tableHTML += `</tbody></table>`;
+    dataContainer.innerHTML = tableHTML;
+};
+
+// 🚨 CORRECCIÓN DE ÁMBITO: renderCards ahora es global (window.)
+window.renderCards = (dataToRender) => {
+    if (!dataContainer) return;
+    let cardsHTML = `<div class="card-grid">`;
+
+    dataToRender.forEach((item, index) => {
+        const isAlert = hasAlert(item);
+        const isInactivityAlert = item.inactividadAlerta;
+        const isMovilCheck = currentSheet !== "Verificacion de objetivos MAC" && currentSheet !== "Verificacion de sitios Aysa";
+        const isBaseCheck = currentSheet === "verificacion de bases";
+        
+        let cardClass = '';
+        let alertIconText = '✅ OK';
+
+        if (isInactivityAlert) {
+            cardClass = 'inactivity-alert-card';
+            alertIconText = '🛑 INACTIVIDAD';
+        } else if (isAlert) {
+            cardClass = 'alert-card';
+            alertIconText = '🚨 ALERTA';
+        }
+        
+        const supervisorDisplay = (item.emailSupervisor && typeof item.emailSupervisor === 'string') ? item.emailSupervisor.split('@')[0] : 'N/A';
+        
+        let vigiladoresSummary = '';
+        if (item.vigiladores && item.vigiladores.length > 0) {
+            vigiladoresSummary = item.vigiladores.map(v => {
+                const namePart = (v.nombre && typeof v.nombre === 'string') ? v.nombre.split(' ')[0] : 'Vigilador';
+                const regStatus = (v.regControlado && v.regControlado.length > 0) ? v.regControlado.substring(0,1) : '?'; 
+                const uniStatus = (v.uniformeCompleto && v.uniformeCompleto.length > 0) ? v.uniformeCompleto.substring(0,1) : '?';
+                return `<li>${namePart} (U:${uniStatus}/R:${regStatus})</li>`;
+            }).join('');
+        } else {
+            vigiladoresSummary = '<li>Sin Vigiladores Chequeados</li>';
+        }
+        
+        const combustibleDisplay = item.combustibleFraccion || 'N/A';
+
+        // 🚨 CÓDIGO CORREGIDO: Usando JSON.stringify y decodeURIComponent para pasar el objeto
+        const itemDataString = JSON.stringify(item); // Definimos la variable dentro del bucle
+                
+        cardsHTML += `
+            <div class="data-card ${cardClass}" data-index="${index}">
+                <div class="card-header">
+                    <h4>${item.patrullaNombre} - ${item.movilDominio || (isBaseCheck ? 'Base Fija' : 'Puesto Fijo')}</h4>
+                    <span class="status-icon">${alertIconText}</span>
+                </div>
+                <p><strong>Fecha:</strong> ${item.timestamp ? item.timestamp.split(',')[0] : 'N/A'}</p>
+                <p><strong>Supervisor:</strong> ${supervisorDisplay}</p>
+                ${isMovilCheck && !isBaseCheck ? `<p><strong>Combustible:</strong> ${combustibleDisplay}</p>` : ''}
+                <p><strong>Vigiladores:</strong> <ul>${vigiladoresSummary}</ul></p>
+                <button class="view-details-btn button-full" 
+                        onclick="event.stopPropagation(); showDetailsModal(JSON.parse(decodeURIComponent('${encodeURIComponent(itemDataString)}')))">
+                    Ver Detalles Completos
+                </button>
+            </div>
+        `;
+    });
+    
+    cardsHTML += `</div>`;
+    dataContainer.innerHTML = cardsHTML;
+};
+
+// Se mantiene showDetailsModal con corrección de color de capacitación
+const showDetailsModal = (item) => {
+    const isMovilCheck = currentSheet !== "Verificacion de objetivos MAC";
+    const isBaseCheck = currentSheet === "verificacion de bases";
+    
+    let basesFaltas = []; 
+
+    const getColorClass = (value) => {
+        if (!value) return '';
+        const lowerValue = value.toString().toLowerCase().trim();
+
+        if (lowerValue === 'no' || lowerValue === 'regular' || lowerValue === 'mala') {
+            return 'text-danger';
+        }
+
+        if (lowerValue === 'si' || lowerValue === 'sí' || lowerValue === 'buena') {
+            return 'text-success';
+        }
+        return ''; 
+    };
+    
+    const isNegativeValue = (value) => {
+        if (!value) return false;
+        const lowerValue = value.toString().toLowerCase();
+        return lowerValue === 'no' || lowerValue === 'regular' || lowerValue === 'mala';
+    };
+
+    // 1. Detalles Generales 
+    let html = `
+        <p><strong>Puesto/Base/Sitio:</strong> ${item.patrullaNombre || 'N/A'}</p>
+        <p><strong>Supervisor:</strong> ${(item.emailSupervisor && typeof item.emailSupervisor === 'string' ? item.emailSupervisor : 'N/A')}</p>
+        <p><strong>Fecha/Hora Chequeo:</strong> ${item.timestamp || 'N/A'}</p>
+        <hr>
+    `;
+
+    // 2. Detalles Específicos de Móvil/Batería/Patrulla/Base
+    if (isBaseCheck) {
+        basesFaltas = getBasesAlertDetails(item); 
+        
+        if (basesFaltas.length > 0) {
+            html += `<h4 class="text-danger">🚨 Faltas en la Base:</h4>
+                     <ul>`;
+            basesFaltas.forEach(falta => {
+                html += `<li><strong class="text-danger">${falta}</strong></li>`;
+            });
+            html += `</ul><hr>`;
+        } else {
+            html += `<p class="text-success">✅ Todos los chequeos básicos de la Base están **OK**.</p><hr>`;
+        }
+        
+        const baseDetailFields = [
+            { label: "Dominio/Móvil", key: "movilDominio", checkAlert: false },
+            { label: "Kilometraje", key: "kilometraje", checkAlert: false },
+            { label: "Nivel de Combustible", key: "combustibleFraccion", checkAlert: false }, 
+            { label: "Higiene de la Base", key: "higieneMovil", checkAlert: true },
+            { label: "Posee Botiquín", key: "poseeBotiquin", checkAlert: true },
+            { label: "Posee Auxilio", key: "poseeAuxilio", checkAlert: true },
+            { label: "Posee Matafuegos en vigencia", key: "poseeMatafuegos", checkAlert: true },
+            { label: "Posee Baliza", key: "poseeBaliza", checkAlert: true },
+            { label: "Posee Linterna", key: "poseeLinterna", checkAlert: true },
+            { label: "Posee Cable para puentear bateria", key: "poseeCableBateria", checkAlert: true },
+            { label: "Posee Capa de lluvia", key: "poseeCapaLluvia", checkAlert: true },
+            { label: "Posee toda la documentacion del movil", key: "poseeDocumentacionMovil", checkAlert: true },
+            { label: "Posee Linga", key: "poseeLinga", checkAlert: true },
+            { label: "Posee Cricket", key: "poseeCricket", checkAlert: true },
+            { label: "Posee Llave Cruz", key: "poseeLlaveCruz", checkAlert: true },
+        ];
+        
+        let baseDetailsHtml = `<h4>Información del Chequeo:</h4>`;
+        let hasBaseInfo = false;
+
+        baseDetailFields.forEach(field => {
+             const value = item[field.key];
+             
+             if (value && value.toString().trim().toUpperCase() !== 'N/A') {
+                 const colorClass = field.checkAlert ? getColorClass(value) : '';
+
+                 baseDetailsHtml += `<p class="${colorClass}"><strong>${field.label}:</strong> ${value}</p>`;
+                 hasBaseInfo = true;
+             }
+        });
+
+        if (hasBaseInfo) {
+            html += baseDetailsHtml;
+        }
+
+    } else if (isMovilCheck) { // Baterías/Patrullas, Sitios Aysa
+        html += `
+            <p><strong>Dominio/Móvil:</strong> ${item.movilDominio || 'N/A'}</p>
+            <p><strong>Kilometraje:</strong> ${item.kilometraje || 'N/A'}</p>
+            <p class="${item.combustibleFraccion && checkCombustible(item.combustibleFraccion).alerta ? 'text-danger' : ''}"><strong>Nivel de Combustible:</strong> ${item.combustibleFraccion || 'N/A'}</p>
+            <p class="${getColorClass(item.higieneMovil)}"><strong>Higiene:</strong> ${item.higieneMovil || 'N/A'}</p>
+            <p class="${getColorClass(item.poseeBotiquin)}"><strong>Posee Botiquín:</strong> ${item.poseeBotiquin || 'N/A'}</p>
+        `;
+    } else { // Objetivos MAC (Puesto Fijo)
+        html += `<p>Dominio/Móvil: N/A - Puesto Fijo</p>`;
+    }
+
+    // 3. Observaciones Generales
+    if (item.observacionesMovil) {
+        html += `<hr><p><strong>Observaciones Generales:</strong> ${item.observacionesMovil || 'Sin observaciones'}</p>`;
+    }
+    
+    html += '<hr>';
+
+    // 4. Listar vigiladores
+    if (item.vigiladores && item.vigiladores.length > 0) {
+        html += `<h4>Vigiladores Chequeados:</h4>`;
+        item.vigiladores.forEach((v, i) => {
+            const isUniformeAlert = isNegativeValue(v.uniformeCompleto);
+            const isCapacitacionAlert = isNegativeValue(v.capacitacion);
+            const isRegAlert = isNegativeValue(v.regControlado);
+            
+            const faltas = [];
+            if (isRegAlert) faltas.push('Falta Registro');
+            if (isUniformeAlert) faltas.push('Falta Uniforme');
+            
+            // La falta de capacitación se informa, pero no es una 'alerta' grave principal
+            if (isCapacitacionAlert) faltas.push('Falta Capacitación'); 
+            
+            const isVigiladorAlert = isRegAlert || isUniformeAlert; // Solo estas dos causan el ícono 🚨
+
+            const statusDisplay = isVigiladorAlert
+                ? `<span class="text-danger">🚨 **Falta Grave:** ${faltas.filter(f => f !== 'Falta Capacitación').join(', ')}</span>`
+                : `<span class="${isCapacitacionAlert ? 'text-warning' : 'text-success'}">${isCapacitacionAlert ? '⚠️ Capacitación Pendiente' : '✅ OK'}</span>`;
+            
+            html += `<div class="vigilador-detail">
+                <h5>Vigilador ${i + 1} (${v.legajo || 'N/A'}) - ${v.nombre || 'N/A'}</h5>
+                <p><strong>Estado:</strong> ${statusDisplay}</p>
+                
+                <p class="${getColorClass(v.regControlado)}"><strong>Registro Controlado / Presentación:</strong> ${v.regControlado || 'N/A'}</p>
+                <p class="${getColorClass(v.uniformeCompleto)}"><strong>Uniforme Completo:</strong> ${v.uniformeCompleto || 'N/A'}</p>
+                
+                <p class="${getColorClass(v.capacitacion)}"><strong>Capacitación Realizada:</strong> ${v.capacitacion || 'N/A'}</p>
+                
+                <p><strong>Observaciones:</strong> ${v.observaciones || 'N/A'}</p>
+            </div>`;
+        });
+    } else {
+        html += `<p>No se registraron vigiladores para este chequeo.</p>`;
+    }
+    
+    modalBody.innerHTML = html;
+    detailsModal.style.display = 'block';
+};
+
+// Event listeners para el modal
+if (closeModal) {
+    closeModal.onclick = () => { detailsModal.style.display = 'none'; };
+};
+
+if (detailsModal) {
+    window.onclick = (event) => {
+        if (event.target == detailsModal) {
+            detailsModal.style.display = 'none';
+        }
+    };
+}
+
+
+// ====================================================================================================
+// 6. INICIALIZACIÓN
+// ====================================================================================================
+
 const initialize = () => {
-    if (searchInput) searchInput.addEventListener('input', filterAndSearch);
-    if (alertFilter) alertFilter.addEventListener('change', filterAndSearch); 
-    window.addEventListener('resize', () => { if (sheetData.length > 0) renderData(sheetData); }); 
+    if (searchInput) searchInput.addEventListener('input', window.filterAndSearch);
+    if (alertFilter) alertFilter.addEventListener('change', window.filterAndSearch); 
+    // Aseguramos que el redimensionamiento también use la función global
+    window.addEventListener('resize', () => { if (sheetData.length > 0) window.renderData(sheetData); }); 
 
     tabButtons.forEach(button => {
         button.addEventListener('click', (event) => {
@@ -545,22 +860,38 @@ const initialize = () => {
         });
     });
 
+    // Configurar el selector de fecha y su listener
+    if (recorridoDateSelector) {
+        // Obtenemos la fecha de hoy asegurando el formato YYYY-MM-DD (sin desfase)
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        const todayISO = `${year}-${month}-${day}`;
+        
+        recorridoDateSelector.value = todayISO;
+        
+        recorridoDateSelector.addEventListener('change', (event) => {
+            const selectedDate = event.target.value;
+            const activeSupervisor = event.target.dataset.activeSupervisor;
+            const rawDailyRecorrido = event.target.dataset.dailyRecorrido;
+            
+            if (activeSupervisor && rawDailyRecorrido) {
+                 const dailyRecorrido = JSON.parse(rawDailyRecorrido);
+                 const supervisorName = activeSupervisor.includes('@') ? activeSupervisor.split('@')[0] : activeSupervisor;
+                 
+                 renderRecorridoForDate(selectedDate, supervisorName, dailyRecorrido);
+            }
+        });
+    }
+
     // Carga Inicial
     const initialTab = document.querySelector(`.tab-button[data-sheet="${currentSheet}"]`);
     if (initialTab) {
         initialTab.classList.add('active');
     }
     
-    // Verificación final de la existencia del contenedor principal de la tabla
-    if (!dataContainer) {
-        console.error("CRITICAL ERROR: El elemento con ID 'dataContainer' no se encontró en el HTML.");
-    }
-
     loadData(currentSheet);
 };
-
-// ====================================================================================================
-// 6. INICIALIZACIÓN
-// ====================================================================================================
 
 window.onload = initialize;
