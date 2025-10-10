@@ -7,12 +7,13 @@
 }
 
 :root {
-    --primary-color: #004d99; /* Azul Corporativo */
+    --primary-color: #004d99; /* Azul Corporativo (MAC) */
     --secondary-color: #6c757d; /* Gris */
     --alert-color: #dc3545; /* Rojo de alerta (Combustible, Botiquín, Uniforme) */
     --inactivity-color: darkred; /* Rojo Oscuro (Inactividad 24h) */
     --success-color: #28a745; /* Verde */
-    --light-bg: #f4f6f9;
+    --light-bg: #f4f6f9; /* Fondo principal */
+    --card-bg: white; /* Fondo de tarjetas y secciones */
     --border-color: #dee2e6;
 }
 
@@ -39,7 +40,7 @@ main {
 .controls {
     margin-bottom: 25px;
     padding: 15px;
-    background: white;
+    background: var(--card-bg);
     border-radius: 10px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
@@ -47,7 +48,7 @@ main {
 /* Estilo de Pestañas */
 .tabs-container {
     display: flex;
-    overflow-x: auto; /* Permite scroll en móvil si hay muchas pestañas */
+    overflow-x: auto; 
     padding-bottom: 5px;
     margin-bottom: 15px;
     border-bottom: 2px solid var(--border-color);
@@ -97,64 +98,214 @@ main {
     color: var(--secondary-color);
 }
 
-/* ======================== SUMARIO (NUEVA SECCIÓN) ======================== */
-.summary {
-    margin-bottom: 25px;
-    padding: 15px;
-    background: white;
+/* ========================================================== */
+/* 🚨 NUEVOS ESTILOS PARA RECORRIDOS_CONSOLIDADOS (SUMMARY/RECORRIDO) */
+/* ========================================================== */
+
+.summary-section {
+    /* Controlado por JS, será 'flex' para esta pestaña, por defecto 'none' */
+    display: none; 
+    gap: 30px;
+    margin-top: 25px;
+    padding: 0 10px;
+}
+
+/* 1. Sumario de Supervisores */
+#supervisorSummary {
+    flex: 1; 
+    min-width: 300px;
+    padding: 20px;
+    background-color: var(--card-bg);
     border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    max-height: 60vh; 
+    overflow-y: auto;
+}
+
+#supervisorSummary h4 {
+    margin-top: 0;
+    color: var(--primary-color);
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 10px;
+    margin-bottom: 15px;
 }
 
 .supervisor-list {
     list-style: none;
     padding: 0;
+    margin: 0;
 }
 
 .supervisor-list li {
-    padding: 8px 12px;
-    margin-bottom: 4px;
-    background-color: #070f16; /* Color de fondo suave */
-    border: 1px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    margin-bottom: 8px;
+    background-color: var(--light-bg); 
+    border-radius: 6px;
     cursor: pointer;
-    border-radius: 4px;
-    transition: background-color 0.2s, border-color 0.2s;
+    border-left: 5px solid transparent;
+    transition: all 0.3s ease;
 }
 
 .supervisor-list li:hover {
-    background-color: #e9ecef; /* Oscurece al pasar el ratón */
+    background-color: #eaf6ff;
+    transform: translateX(3px);
 }
 
-/* Estilo para el supervisor actualmente seleccionado */
 .supervisor-list li.active-supervisor {
-    background-color: #007bff; /* Color primario */
-    color: rgb(12, 11, 11);
-    border-color: #0056b3;
+    border-left-color: var(--primary-color);
+    background-color: #e0ecff; /* Fondo claro de la selección */
     font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
-#supervisorSummary h4 {
-    margin-bottom: 10px;
+.supervisor-list li.list-alert {
+    border-left-color: var(--alert-color) !important;
+    background-color: #fff0f0;
+}
+
+.supervisor-list li span:last-child {
+    font-size: 0.8em;
+    color: var(--secondary-color);
+    min-width: 80px;
+    text-align: right;
+}
+
+/* 2. Controles de Fecha y Recorrido */
+.recorrido-details-container {
+    flex: 2;
+    min-width: 400px;
+}
+
+.recorrido-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    background-color: var(--card-bg);
+    border-radius: 10px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+#recorridoInstructions {
+    font-size: 1.1em;
+    font-weight: 500;
     color: #333;
+    margin: 0;
+    padding-right: 15px;
 }
 
-#supervisorSummary ul {
+#recorridoDateSelector {
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background-color: #f7f7f7;
+    font-size: 1em;
+    cursor: pointer;
+}
+
+/* 3. Timeline de Recorrido */
+#recorridoContainer {
+    padding: 0;
+}
+
+.recorrido-day-card {
+    background-color: var(--card-bg);
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.recorrido-day-card .card-header {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 15px 20px;
+    font-size: 1.2em;
+    font-weight: bold;
+    margin-bottom: 0;
+}
+
+.recorrido-timeline {
     list-style: none;
     padding: 0;
-    margin-top: 10px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 15px;
+    margin: 0;
 }
 
-#supervisorSummary li {
-    background-color: #e9ecef;
-    padding: 8px 12px;
-    border-radius: 4px;
+.recorrido-item {
+    display: flex;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px solid #eee;
+    transition: background-color 0.2s;
+}
+
+.recorrido-item:last-child {
+    border-bottom: none;
+}
+
+.recorrido-item:hover {
+    background-color: #f4f4f4;
+}
+
+.item-time {
+    font-weight: bold;
+    color: var(--primary-color);
+    min-width: 110px; 
+    font-size: 1.1em;
+}
+
+.item-details {
+    flex-grow: 1;
+    margin: 0 15px;
+}
+
+.item-location {
+    display: block;
+    font-size: 0.95em;
+    color: #444;
+}
+
+.btn-detail {
+    background-color: var(--secondary-color);
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-left: auto;
+    transition: background-color 0.2s;
     font-size: 0.9em;
 }
 
-/* ======================== ALERTAS Y TABLA ======================== */
+.btn-detail:hover {
+    background-color: #5a6268;
+}
+
+.recorrido-item.item-alert {
+    background-color: #fff5f5; 
+    border-left: 5px solid var(--alert-color);
+}
+
+.recorrido-item.item-alert .btn-detail {
+    background-color: var(--alert-color);
+}
+
+.recorrido-item.item-alert .btn-detail:hover {
+    background-color: darkred;
+}
+
+/* ========================================================== */
+/* RESTO DE SECCIONES (Tabla, Cards, Modal) */
+/* ========================================================== */
+
+.data-display h2 {
+    margin-bottom: 15px;
+}
+
+/* ALERTAS Y TABLA */
 .text-danger, .alert-text {
     color: var(--alert-color);
     font-weight: bold;
@@ -164,7 +315,7 @@ main {
     width: 100%;
     border-collapse: collapse;
     margin-top: 20px;
-    background: white;
+    background: var(--card-bg);
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
@@ -176,7 +327,7 @@ main {
 }
 
 .data-table th {
-    background-color: #003366; /* Azul oscuro para mejor contraste */
+    background-color: #003366; 
     color: white;
     font-weight: 600;
 }
@@ -194,7 +345,7 @@ main {
 
 /* ¡Alerta CRÍTICA: Inactividad > 24h! */
 .inactivity-alert-row {
-    background-color: #ffd7d7 !important; /* Rojo claro más intenso */
+    background-color: #ffd7d7 !important; 
     border-left: 5px solid var(--inactivity-color);
     font-weight: bold;
     color: var(--inactivity-color);
@@ -202,17 +353,17 @@ main {
 
 /* Corrección de Alerta de Botiquín/Uniforme: Si la respuesta es 'Sí' */
 .text-success {
-    color: var(--success-color); /* Verde definido en :root */
+    color: var(--success-color);
     font-weight: bold;
 }
 
 .inactivity-alert-row td {
-    color: #333; /* Reset color de texto para las celdas */
+    color: #333; 
 }
 
 .button-small, .button-full {
     padding: 8px 12px;
-    background-color: var(--success-color);
+    background-color: var(--primary-color); /* Usamos el color principal para botones de detalle */
     color: white;
     border: none;
     border-radius: 4px;
@@ -222,10 +373,10 @@ main {
 }
 
 .button-small:hover, .button-full:hover {
-    background-color: #1e7e34;
+    background-color: #003366;
 }
 
-/* ======================== CARDS (MÓVIL: <=900px) ======================== */
+/* CARDS (MÓVIL: <=900px) */
 .card-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -234,7 +385,7 @@ main {
 }
 
 .data-card {
-    background: white;
+    background: var(--card-bg);
     padding: 20px;
     border-radius: 10px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -275,8 +426,7 @@ main {
     margin-top: 15px;
 }
 
-
-/* ======================== MODAL DE DETALLES ======================== */
+/* MODAL DE DETALLES */
 .modal {
     display: none; 
     position: fixed; 
@@ -317,60 +467,11 @@ main {
 .vigilador-detail {
     padding: 12px;
     margin: 10px 0;
-    border-left: 4px solid var(--secondary-color);
+    border-left: 4px solid var(--primary-color); /* Usa el color principal */
     background-color: var(--light-bg);
     border-radius: 4px;
 }
 
-/* Estilos para el nuevo panel de Recorrido */
-.recorrido-display {
-    margin-top: 30px;
-    padding-top: 20px;
-    border-top: 2px solid #ccc;
-}
-.recorrido-box {
-    background-color: #f7f7f7;
-    padding: 15px;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-.recorrido-day-card {
-    margin-bottom: 15px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    overflow: hidden;
-}
-.recorrido-day-card .card-header {
-    background-color: #007bff; /* Color primario */
-    color: white;
-    padding: 10px 15px;
-}
-.recorrido-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 15px;
-    border-bottom: 1px solid #eee;
-}
-.item-alert {
-    background-color: #fff3cd; /* Amarillo claro */
-}
-.btn-detail {
-    background: #007bff;
-    color: white;
-    border: none;
-    padding: 5px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.9em;
-}
-.item-alert .btn-detail {
-    background: #dc3545; /* Rojo para las alertas */
-}
-.item-time {
-    font-weight: bold;
-    min-width: 120px;
-}
 
 /* ======================== MEDIA QUERIES (RESPONSIVE) ======================== */
 
@@ -387,7 +488,6 @@ main {
         display: none; 
     }
     .filter-bar {
-        /* Permite que los inputs se extiendan completamente */
         flex-direction: column;
     }
     #searchInput, #alertFilter {
@@ -395,3 +495,55 @@ main {
     }
 }
 
+/* Ajustes para la sección de recorrido en móvil (Recorridos_Consolidados) */
+@media (max-width: 768px) {
+    
+    .summary-section {
+        flex-direction: column;
+        gap: 20px;
+        padding: 0 5px;
+    }
+
+    #supervisorSummary {
+        max-height: 40vh; 
+        min-width: 100%;
+    }
+
+    .recorrido-details-container {
+        min-width: 100%;
+    }
+
+    .recorrido-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        padding: 15px;
+    }
+
+    #recorridoInstructions {
+        text-align: center;
+        padding-right: 0;
+    }
+
+    .recorrido-item {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 15px 10px;
+    }
+
+    .item-time {
+        margin-bottom: 5px;
+        font-size: 1em;
+    }
+    
+    .item-details {
+        margin: 0;
+        width: 100%;
+        margin-bottom: 10px;
+    }
+    
+    .btn-detail {
+        align-self: flex-end; 
+        margin-top: -10px; 
+    }
+}

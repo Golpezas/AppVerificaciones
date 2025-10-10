@@ -18,41 +18,44 @@ const modalBody = document.getElementById('modalBody');
 const closeModal = document.querySelector('.close-button');
 const tabButtons = document.querySelectorAll('.tab-button');
 
-// Referencias del DOM para el SUMARIO y RECORRIDO
+// Referencias del DOM para la VISIBILIDAD y RECORRIDO
 const supervisorSummary = document.getElementById('supervisorSummary');
 const recorridoContainer = document.getElementById('recorridoContainer');
 const recorridoInstructions = document.getElementById('recorridoInstructions');
 const resultsTitle = document.getElementById('resultsTitle'); 
 const recorridoDateSelector = document.getElementById('recorridoDateSelector');
+const summarySection = document.querySelector('.summary-section'); 
+const dataDisplaySection = document.querySelector('.data-display');
+
+// Variables de estado del recorrido
+let activeSupervisorEmail = null;
 
 
 // ====================================================================================================
-// 2. FUNCIONES DE CARGA Y ORDENAMIENTO (Corregidas para la hora local)
+// 2. FUNCIONES DE CARGA Y ORDENAMIENTO
 // ====================================================================================================
 
 /**
  * Función auxiliar para obtener un valor numérico (milisegundos) comparable basado en la fecha y hora.
- * CRÍTICO: Utiliza el constructor local para mitigar el problema de desfase de zona horaria.
  */
 const getDateSortValue = (timestampString) => {
     if (!timestampString) return 0;
 
     // Formato: "DD/MM/AAAA, HH:MM:SS p.m."
-    
     const [datePartWithSpaces, timePartWithSpaces] = timestampString.split(', ');
     
     let datePart = datePartWithSpaces ? datePartWithSpaces.trim() : null;
     let timePart = timePartWithSpaces ? timePartWithSpaces.trim() : null;
     
     if (!datePart || !timePart) {
-         // Intenta el formato sin coma si falla el primero
-         const parts = timestampString.trim().split(' ');
-         if (parts.length >= 2) {
-             timePart = parts.pop();
-             datePart = parts.join(' ');
-         } else {
-             return 0;
-         }
+        // Intenta el formato sin coma si falla el primero
+        const parts = timestampString.trim().split(' ');
+        if (parts.length >= 2) {
+            timePart = parts.pop();
+            datePart = parts.join(' ');
+        } else {
+            return 0;
+        }
     }
     
     // 1. Obtener partes de la fecha (DD, MM, AAAA)
@@ -83,31 +86,40 @@ const getDateSortValue = (timestampString) => {
     // Construcción: Usamos el constructor local (Year, MonthIndex, Day, Hour, Minute, Second)
     const dateObj = new Date(year, monthIndex, day, hour, minute, second);
 
-    // Devolvemos el valor numérico (milisegundos) para la comparación
     return isNaN(dateObj.getTime()) ? 0 : dateObj.getTime();
 };
 
 
 const loadData = async (sheetName) => {
     currentSheet = sheetName;
+    const isRecorridoTab = sheetName === "Recorridos_Consolidados";
+    
+    // 🚨 CONTROL DE VISIBILIDAD CRÍTICO
+    // Muestra el sumario/recorrido y oculta la tabla estándar si es la pestaña consolidada
+    if (summarySection) summarySection.style.display = isRecorridoTab ? 'flex' : 'none';
+    if (dataDisplaySection) dataDisplaySection.style.display = isRecorridoTab ? 'none' : 'block';
+    
+    // Oculta los filtros de búsqueda en la pestaña consolidada
+    if (searchInput) searchInput.style.display = isRecorridoTab ? 'none' : 'block';
+    if (alertFilter) alertFilter.style.display = isRecorridoTab ? 'none' : 'block';
     
     // 1. Limpieza y mensajes de carga
     if (dataContainer) {
         dataContainer.innerHTML = `<p class="loading-message">Cargando datos de **${sheetName}**, por favor espere...</p>`;
     }
     if (supervisorSummary) {
-        supervisorSummary.innerHTML = '<p>Cargando sumario...</p>';
-    }
-    // Restablecer el recorrido
-    if (recorridoContainer && recorridoInstructions) {
-        recorridoContainer.innerHTML = ''; 
-        recorridoInstructions.textContent = 'Selecciona un supervisor del sumario para ver su recorrido.';
+        if (isRecorridoTab) {
+            supervisorSummary.innerHTML = '<h4>Supervisores y Cantidad de Chequeos Consolidados:</h4><p>Cargando sumario...</p>';
+        } else {
+             // Limpia el contenido de la sección de recorrido si cambiamos a una pestaña normal
+             if (recorridoContainer) recorridoContainer.innerHTML = '';
+             if (recorridoInstructions) recorridoInstructions.textContent = 'Selecciona un supervisor para ver su recorrido.';
+        }
     }
     
     const fullUrl = `${API_URL}?sheet=${encodeURIComponent(sheetName)}`;
 
     try {
-        // 2. Obtener datos
         const response = await fetch(fullUrl);
         const data = await response.json();
 
@@ -117,17 +129,20 @@ const loadData = async (sheetName) => {
         
         sheetData = data; 
         
-        // 🚀 CRÍTICO: Ordenamiento DESCENDENTE (Más Reciente a Más Antiguo)
+        // Ordenamiento DESCENDENTE (Más Reciente a Más Antiguo)
         sheetData.sort((a, b) => {
             const sortValueA = getDateSortValue(a.timestamp); 
             const sortValueB = getDateSortValue(b.timestamp);
-            return sortValueB - sortValueA; // B - A para DESCENDENTE
+            return sortValueB - sortValueA; 
         });
 
         // 4. Actualizar UI
-        sheetData = checkInactivity(sheetData); 
-        updateSummaryData(sheetData); 
-        window.filterAndSearch(); // Muestra la tabla principal (ya ordenada) o aplica filtros
+        if (!isRecorridoTab) {
+            sheetData = checkInactivity(sheetData); 
+            window.filterAndSearch(); 
+        } else {
+            updateSummaryData(sheetData);
+        }
         
     } catch (error) {
         console.error("Fallo al obtener los datos:", error);
@@ -135,12 +150,14 @@ const loadData = async (sheetName) => {
              dataContainer.innerHTML = `<p class="text-danger">❌ **Error de Conexión/Datos:** Verifique la URL de la API y el formato de los datos. Error: ${error.message}</p>`;
         }
         if (countDisplay) countDisplay.textContent = 0;
-        if (supervisorSummary) supervisorSummary.innerHTML = `<p class="text-danger">Error: No se pudo cargar el sumario.</p>`;
+        if (supervisorSummary && isRecorridoTab) {
+             supervisorSummary.innerHTML = `<p class="text-danger">Error: No se pudo cargar el sumario.</p>`;
+        }
     }
 };
 
 // ====================================================================================================
-// 3. LÓGICA DE NEGOCIO Y ALERTAS (hasAlert Corregida para capacitación)
+// 3. LÓGICA DE NEGOCIO Y ALERTAS
 // ====================================================================================================
 
 const checkCombustible = (fraccion) => {
@@ -152,6 +169,7 @@ const checkCombustible = (fraccion) => {
     if (den === 0 || isNaN(num) || isNaN(den)) return { valor: 100, alerta: false };
 
     const valor = (num / den) * 100;
+    // Se considera alerta si es menor o igual a 6/16 (~37.5%)
     return {
         valor: valor,
         alerta: valor <= (6/16 * 100) 
@@ -191,25 +209,28 @@ const getBasesAlertDetails = (item) => {
 };
 
 const hasAlert = (item) => {
-    const checkMovil = currentSheet !== "Verificacion de objetivos MAC";
-    const isBaseCheck = currentSheet === "verificacion de bases";
+    // Determina si las comprobaciones deben basarse en el origen de la hoja o en la hoja actual
+    const isRecorridoCheck = currentSheet === "Recorridos_Consolidados";
+    const sheetToCheck = isRecorridoCheck ? (item.HojaOrigen || currentSheet) : currentSheet;
 
-    if (isBaseCheck) {
-        return getBasesAlertDetails(item).length > 0;
-    }
+    const checkMovil = sheetToCheck !== "Verificacion de objetivos MAC";
+    const isBaseCheck = sheetToCheck === "verificacion de bases";
 
-    if (checkMovil && item.combustibleFraccion && checkCombustible(item.combustibleFraccion).alerta) {
+    // Alerta de bases
+    if (isBaseCheck && getBasesAlertDetails(item).length > 0) {
         return true;
     }
-    
+
+    // Alerta de Combustible, Higiene o Botiquín (aplica si hay datos de móvil)
     if (checkMovil) {
+        if (item.combustibleFraccion && checkCombustible(item.combustibleFraccion).alerta) return true;
         if (isNegative(item.poseeBotiquin)) return true;
         if (isNegative(item.higieneMovil)) return true;
     }
     
+    // Alerta de Vigiladores
     if (item.vigiladores && item.vigiladores.length > 0) {
         const vigiladorAlerta = item.vigiladores.some(v => 
-            // 🚨 CORRECCIÓN: La capacitación NO genera la alerta principal.
             isNegative(v.uniformeCompleto) || 
             isNegative(v.regControlado)
         );
@@ -247,48 +268,78 @@ const checkInactivity = (data) => {
         
         const isLatestReport = item.timestamp && getDateSortValue(item.timestamp) === lastReport.sortValue;
         
+        // La alerta de inactividad solo se aplica al reporte más reciente para esa ubicación
         item.inactividadAlerta = isLatestReport && hasPassedThreshold;
         
         return item;
     });
 };
 
+/**
+ * Renderiza el sumario de supervisores para la pestaña consolidada.
+ */
 const updateSummaryData = (data) => {
-    const supervisorCounts = {};
-    
-    data.filter(item => item.emailSupervisor).forEach(item => {
-        const key = item.emailSupervisor.trim().toLowerCase(); 
-        supervisorCounts[key] = (supervisorCounts[key] || 0) + 1;
-    });
+    const supervisorCounts = data.reduce((acc, item) => {
+        const email = item.emailSupervisor;
+        if (email && email.trim() !== '') {
+            const key = email.trim().toLowerCase();
+            if (!acc[key]) {
+                acc[key] = {
+                    count: 0,
+                    lastCheck: item.timestamp 
+                };
+            }
+            acc[key].count++;
+            // Mantiene el timestamp más reciente
+            if (getDateSortValue(item.timestamp) > getDateSortValue(acc[key].lastCheck)) {
+                 acc[key].lastCheck = item.timestamp;
+            }
+        }
+        return acc;
+    }, {});
 
-    let html = '<h4>Supervisores y Cantidad de Informes:</h4><ul class="supervisor-list">';
-    const sortedSupervisors = Object.entries(supervisorCounts).sort(([, a], [, b]) => b - a);
+    let html = '<h4>Supervisores y Cantidad de Chequeos Consolidados:</h4>';
+    const sortedSupervisors = Object.entries(supervisorCounts).sort(([, a], [, b]) => b.count - a.count);
 
-    if (sortedSupervisors.length > 0) {
-        sortedSupervisors.forEach(([supervisorEmail, count]) => {
-            const displaySupervisor = supervisorEmail.includes('@') ? supervisorEmail.split('@')[0] : supervisorEmail; 
-            
-            html += `<li onclick="window.showSupervisorRecorrido('${supervisorEmail}')" data-email="${supervisorEmail}">
-                        <span class="supervisor-name">${displaySupervisor}</span>: 
-                        <span class="report-count">${count} chequeos</span>
-                     </li>`;
-        });
-    } else {
-        html = '<p>No hay registros válidos de supervisores en esta hoja.</p>';
+    if (sortedSupervisors.length === 0) {
+        html += '<p class="text-info">No se encontraron chequeos para supervisores.</p>';
+        supervisorSummary.innerHTML = html;
+        // Limpiar controles de recorrido si no hay datos
+        if (recorridoContainer) recorridoContainer.innerHTML = '';
+        if (recorridoInstructions) recorridoInstructions.textContent = 'No hay datos para mostrar.';
+        return;
     }
-    
+
+    html += '<ul class="supervisor-list">';
+    sortedSupervisors.forEach(([email, details]) => {
+        const name = email.split('@')[0]; // Usa la parte antes del @ como nombre visible
+        
+        // Formato para mostrar la fecha: solo fecha, no hora
+        const lastDateDisplay = details.lastCheck ? details.lastCheck.split(',')[0].trim() : 'N/A';
+        const isAlert = data.filter(item => item.emailSupervisor && item.emailSupervisor.toLowerCase() === email && hasAlert(item)).length > 0;
+        
+        html += `
+            <li data-email="${email}" onclick="window.showSupervisorRecorrido('${email}')" 
+                title="Ver recorrido de ${name}"
+                class="${isAlert ? 'list-alert' : ''}">
+                <strong>${name} ${isAlert ? '🚨' : ''}</strong>
+                <span>Chequeos: ${details.count}</span>
+                <span class="small-text">Último: ${lastDateDisplay}</span>
+            </li>
+        `;
+    });
     html += '</ul>';
-    if(supervisorSummary) supervisorSummary.innerHTML = html;
+    supervisorSummary.innerHTML = html;
 };
 
 
 // ====================================================================================================
-// 4. LÓGICA DE RECORRIDO Y FILTRO DE FECHA (groupRecorridoByDay Corregido para la hora local)
+// 4. LÓGICA DE RECORRIDO Y FILTRO DE FECHA
 // ====================================================================================================
 
 /**
  * Agrupa las verificaciones de un supervisor por día y asegura el orden cronológico.
- * CORREGIDO: Usa métodos locales para evitar el desfase de zona horaria al crear la clave del día.
+ * Retorna un objeto donde la clave es la fecha ISO (YYYY-MM-DD).
  */
 const groupRecorridoByDay = (data) => {
     const dailyRecorrido = {};
@@ -299,12 +350,11 @@ const groupRecorridoByDay = (data) => {
 
         const dateObj = new Date(sortValue); 
         
-        // 🚨 CRÍTICO: Usamos métodos locales para generar la clave YYYY-MM-DD
+        // Convertir a formato ISO YYYY-MM-DD para la clave (fácil de comparar con input[type=date])
         const year = dateObj.getFullYear();
         const month = String(dateObj.getMonth() + 1).padStart(2, '0');
         const day = String(dateObj.getDate()).padStart(2, '0');
-        
-        const dayKey = `${year}-${month}-${day}`; // Clave YYYY-MM-DD
+        const dayKey = `${year}-${month}-${day}`; 
 
         if (!dailyRecorrido[dayKey]) {
             dailyRecorrido[dayKey] = [];
@@ -317,7 +367,6 @@ const groupRecorridoByDay = (data) => {
         dailyRecorrido[day].sort((a, b) => {
             const timeA = getDateSortValue(a.timestamp);
             const timeB = getDateSortValue(b.timestamp);
-            
             return timeA - timeB; // Ascendente (A - B)
         });
     }
@@ -325,36 +374,36 @@ const groupRecorridoByDay = (data) => {
     return dailyRecorrido;
 };
 
+
 /**
- * Genera el nombre de la ubicación relevante según la pestaña activa.
+ * Genera el nombre de la ubicación relevante para el timeline.
  */
-const getDisplayLocation = (check, currentSheet) => {
+const getDisplayLocation = (check, sheet) => {
     const locationName = check.patrullaNombre || 'Ubicación Desconocida';
     const movilDominio = check.movilDominio || '';
     
-    switch (currentSheet) {
+    // Lógica para la pestaña CONSOLIDADA (usa HojaOrigen)
+    if (sheet === "Recorridos_Consolidados") {
+        const sheetSource = check.HojaOrigen || 'N/A';
         
-        case "Verificacion de Baterias/Patrullas":
-            if (movilDominio && movilDominio.trim().toUpperCase() !== 'N/A' && locationName !== 'Ubicación Desconocida') {
-                 return `${movilDominio} - ${locationName}`;
-            }
-            return locationName;
-            
-        case "Verificacion de objetivos MAC":
-        case "Verificacion de sitios Aysa": 
-            return locationName; 
-
-        case "verificacion de bases":
-             return `${locationName} - Base Fija`;
-             
-        default:
-             return `${locationName} ${movilDominio ? '- ' + movilDominio : ''}`;
+        const typeMap = {
+             "Verificacion de Baterias/Patrullas": "B/P",
+             "Verificacion de objetivos MAC": "MAC",
+             "Verificacion de sitios Aysa": "AYSA",
+             "verificacion de bases": "BASE",
+        };
+        
+        const typeDisplay = typeMap[sheetSource] || sheetSource.replace('Verificacion de ', '').replace('verificacion de ', '');
+        
+        return `${locationName} (${typeDisplay})`;
     }
+    
+    // Lógica para las pestañas individuales (no usada aquí, pero se mantiene la función genérica)
+    return `${locationName} - ${movilDominio || 'Puesto Fijo'}`;
 };
 
 /**
- * Función que renderiza el HTML del recorrido para un día específico.
- * Nota: El objeto 'check' se pasa al modal via JSON encoding/decoding.
+ * Función que renderiza el HTML del recorrido para un día específico (Timeline).
  */
 const renderRecorridoForDate = (dayISO, supervisorName, dailyRecorrido) => {
     if (!recorridoContainer) return;
@@ -366,13 +415,13 @@ const renderRecorridoForDate = (dayISO, supervisorName, dailyRecorrido) => {
     if (!checks || checks.length === 0) {
         let availableDaysHtml = availableDays.length > 0 
             ? `<p><strong>Días con chequeos:</strong> ${availableDays.map(d => {
-                 const dateParts = d.split('-'); 
-                 return `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`; 
-              }).join(', ')}</p>`
+                   const dateParts = d.split('-'); // YYYY-MM-DD
+                   return `${dateParts[2]}/${dateParts[1]}`; // DD/MM
+               }).join(', ')}</p>`
             : `<p>Este supervisor no tiene chequeos registrados.</p>`;
             
         recorridoContainer.innerHTML = `<div class="card p-3 text-center">
-                                            <h4>No hay chequeos registrados el ${dayISO}</h4>
+                                            <h4>No hay chequeos registrados el ${new Date(dayISO).toLocaleDateString()}</h4>
                                             <p>Selecciona otra fecha o supervisor.</p>
                                             ${availableDaysHtml}
                                         </div>`;
@@ -381,11 +430,11 @@ const renderRecorridoForDate = (dayISO, supervisorName, dailyRecorrido) => {
 
     let html = '';
     
-    const dayCheck = checks[0].timestamp ? checks[0].timestamp.split(',')[0].trim() : dayISO; 
+    const dayCheck = checks[0].timestamp ? checks[0].timestamp.split(',')[0].trim() : new Date(dayISO).toLocaleDateString(); 
     
     html += `<div class="card recorrido-day-card">
                 <div class="card-header">Día: <strong>${dayCheck}</strong> (${checks.length} Chequeos)</div>
-                <ul class="list-group list-group-flush">`;
+                <ul class="list-group list-group-flush recorrido-timeline">`;
 
     checks.forEach((check) => {
         
@@ -393,15 +442,17 @@ const renderRecorridoForDate = (dayISO, supervisorName, dailyRecorrido) => {
         const isAlert = hasAlert(check); 
         const checkDataString = JSON.stringify(check); 
         
-        const displayLocation = getDisplayLocation(check, currentSheet);
+        const displayLocation = getDisplayLocation(check, "Recorridos_Consolidados");
 
         html += `
             <li class="list-group-item recorrido-item ${isAlert ? 'item-alert' : ''}">
-                <span class="item-time">[${timePart}]</span> 
-                <span class="item-location"><strong>${displayLocation}</strong></span>
+                <div class="item-time">${timePart}</div> 
+                <div class="item-details">
+                    <span class="item-location"><strong>${displayLocation}</strong></span>
+                </div>
                 <button class="btn-detail" 
                         onclick="event.stopPropagation(); showDetailsModal(JSON.parse(decodeURIComponent('${encodeURIComponent(checkDataString)}')))">
-                    ${isAlert ? '🚨 Detalle' : '✅ Detalle'}
+                    ${isAlert ? '🚨 Ver Detalle' : '✅ Ver Detalle'}
                 </button>
             </li>
         `;
@@ -413,19 +464,20 @@ const renderRecorridoForDate = (dayISO, supervisorName, dailyRecorrido) => {
 
 
 window.showSupervisorRecorrido = (emailSupervisor) => {
-    if (!recorridoContainer || !recorridoInstructions || !recorridoDateSelector) {
-         console.warn("Error: Elementos del DOM no definidos para el recorrido.");
-         return;
+    if (!recorridoContainer || !recorridoInstructions || !recorridoDateSelector || currentSheet !== "Recorridos_Consolidados") {
+          return; // No hacer nada si no estamos en la pestaña correcta
     }
     
+    // 1. Marcar el supervisor activo
     const allListItems = document.querySelectorAll('.supervisor-list li');
     allListItems.forEach(li => li.classList.remove('active-supervisor'));
     
     const clickedItem = document.querySelector(`.supervisor-list li[data-email="${emailSupervisor}"]`);
     if(clickedItem) clickedItem.classList.add('active-supervisor');
 
-    recorridoDateSelector.dataset.activeSupervisor = emailSupervisor;
-
+    activeSupervisorEmail = emailSupervisor;
+    
+    // 2. Filtrar y agrupar los datos
     const supervisorData = sheetData.filter(item => 
         item.emailSupervisor && item.emailSupervisor.trim().toLowerCase() === emailSupervisor.trim().toLowerCase()
     );
@@ -434,29 +486,34 @@ window.showSupervisorRecorrido = (emailSupervisor) => {
 
     if (supervisorData.length === 0) {
         recorridoContainer.innerHTML = `<p class="text-danger">No se encontraron chequeos para ${supervisorName}.</p>`;
-        recorridoInstructions.innerHTML = `<p>Recorrido detallado para: <strong>${supervisorName}</strong></p>`;
+        recorridoInstructions.innerHTML = `Ruta de Chequeos de: <strong>${supervisorName}</strong>`;
         return;
     }
 
     const dailyRecorrido = groupRecorridoByDay(supervisorData); 
 
-    recorridoDateSelector.dataset.dailyRecorrido = JSON.stringify(dailyRecorrido);
-
-    const selectedDateISO = recorridoDateSelector.value; 
+    // 3. Determinar y establecer la fecha más reciente
+    const availableDates = Object.keys(dailyRecorrido).sort().reverse(); // YYYY-MM-DD
+    const latestDateISO = availableDates[0] || recorridoDateSelector.value;
     
-    renderRecorridoForDate(selectedDateISO, supervisorName, dailyRecorrido);
+    recorridoDateSelector.value = latestDateISO;
+    recorridoDateSelector.dataset.activeSupervisor = emailSupervisor;
+    // Guardamos los datos agrupados en el dataset para accederlos desde el listener de cambio de fecha
+    recorridoDateSelector.dataset.dailyRecorrido = JSON.stringify(dailyRecorrido); 
+    
+    // 4. Renderizar el recorrido
+    renderRecorridoForDate(latestDateISO, supervisorName, dailyRecorrido);
 
-    recorridoInstructions.innerHTML = `<p>Recorrido detallado para: <strong>${supervisorName}</strong></p>`;
+    recorridoInstructions.innerHTML = `Ruta de Chequeos de: <strong>${supervisorName}</strong>`;
     recorridoContainer.scrollIntoView({ behavior: 'smooth' });
 };
 
 
 // ====================================================================================================
-// 5. RENDERIZADO Y BÚSQUEDA (CORRECCIÓN CRÍTICA DE ÁMBITO Y ACCESO A DATA)
+// 5. RENDERIZADO Y BÚSQUEDA (Globales)
 // ====================================================================================================
 
 window.filterAndSearch = () => {
-    // 🚨 Usar una copia de los datos globales YA ordenados para empezar a filtrar
     let filteredData = [...sheetData]; 
 
     const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
@@ -475,7 +532,7 @@ window.filterAndSearch = () => {
             const puestoMatch = item.patrullaNombre.toLowerCase().includes(searchTerm);
 
             const movilMatch = item.movilDominio && item.movilDominio.toLowerCase().includes(searchTerm);
-                                        
+                                             
             const vigiladorMatch = item.vigiladores && item.vigiladores.some(v => 
                 (v.nombre && v.nombre.toLowerCase().includes(searchTerm)) || 
                 (v.legajo && v.legajo.includes(searchTerm)) ||
@@ -486,7 +543,6 @@ window.filterAndSearch = () => {
         });
     }
     
-    // 🚨 Llamada corregida a la función global
     window.renderData(filteredData);
 };
 
@@ -515,6 +571,7 @@ const getDynamicHeaders = () => {
         'Móvil/Tipo',
         'Supervisor', 
         'Fecha Chequeo',
+        // Oculta Combustible/Km para MAC, AYSA y BASES
         ...((currentSheet === "Verificacion de objetivos MAC" || currentSheet === "verificacion de bases" || currentSheet === "Verificacion de sitios Aysa") ? [''] : ['Combustible', 'Km']), 
         'Vigiladores (U/R)', 
         'Detalles'
@@ -523,11 +580,9 @@ const getDynamicHeaders = () => {
     return headers.filter(h => h.trim() !== '');
 };
 
-// 🚨 CORRECCIÓN DE ÁMBITO: renderData ahora es global (window.)
 window.renderData = (dataToRender) => {
     if (!dataContainer) {
-         console.warn("Error: dataContainer no está definido.");
-         return;
+          return;
     }
 
     dataContainer.innerHTML = '';
@@ -535,8 +590,6 @@ window.renderData = (dataToRender) => {
     if (countDisplay) countDisplay.textContent = dataToRender.length;
     if (resultsTitle) resultsTitle.textContent = `Resultados del Chequeo (${dataToRender.length})`;
 
-    // Las llamadas a renderTable/renderCards no necesitan 'window.' si son declaradas antes, 
-    // pero para seguridad total las hacemos globales también.
     if (window.innerWidth > 900) {
         window.renderTable(dataToRender);
     } else {
@@ -544,7 +597,6 @@ window.renderData = (dataToRender) => {
     }
 };
 
-// 🚨 CORRECCIÓN DE ÁMBITO: renderTable ahora es global (window.)
 window.renderTable = (dataToRender) => {
     if (!dataContainer) return;
     const headers = getDynamicHeaders();
@@ -567,9 +619,9 @@ window.renderTable = (dataToRender) => {
         
         let alertClass = '';
         if (isInactivityAlert) { 
-            alertClass = 'inactivity-alert-row'; // 🛑 (Alerta de Inactividad 24h)
+            alertClass = 'inactivity-alert-row'; 
         } else if (isAlert) {
-            alertClass = 'alert-row'; // 🚨 (Alerta de Chequeo/Fallas)
+            alertClass = 'alert-row'; 
         }
         
         const statusIcon = isInactivityAlert ? '🛑' : (isAlert ? '🚨' : '✅'); 
@@ -577,11 +629,11 @@ window.renderTable = (dataToRender) => {
         let vigiladoresSummary = 'N/A';
         if (item.vigiladores && item.vigiladores.length > 0) {
              vigiladoresSummary = item.vigiladores.map(v => {
-                const namePart = (v.nombre && typeof v.nombre === 'string') ? v.nombre.split(' ')[0] : 'Vigilador';
-                const regStatus = (v.regControlado && v.regControlado.length > 0) ? v.regControlado.substring(0,1) : '?'; 
-                const uniStatus = (v.uniformeCompleto && v.uniformeCompleto.length > 0) ? v.uniformeCompleto.substring(0,1) : '?';
-                return `${namePart} (${uniStatus}/${regStatus})`;
-            }).join('<br>');
+                 const namePart = (v.nombre && typeof v.nombre === 'string') ? v.nombre.split(' ')[0] : 'Vigilador';
+                 const regStatus = (v.regControlado && v.regControlado.length > 0) ? v.regControlado.substring(0,1) : '?'; 
+                 const uniStatus = (v.uniformeCompleto && v.uniformeCompleto.length > 0) ? v.uniformeCompleto.substring(0,1) : '?';
+                 return `${namePart} (${uniStatus}/${regStatus})`;
+             }).join('<br>');
         }
         
         const combustibleDisplay = item.combustibleFraccion || 'N/A';
@@ -591,7 +643,6 @@ window.renderTable = (dataToRender) => {
         
         const showMovilDetails = isMovilCheck && !isBaseCheck;
 
-        // 🚨 CÓDIGO CORREGIDO: Usando JSON.stringify y decodeURIComponent para pasar el objeto
         const itemDataString = JSON.stringify(item);
         
         tableHTML += `
@@ -618,7 +669,6 @@ window.renderTable = (dataToRender) => {
     dataContainer.innerHTML = tableHTML;
 };
 
-// 🚨 CORRECCIÓN DE ÁMBITO: renderCards ahora es global (window.)
 window.renderCards = (dataToRender) => {
     if (!dataContainer) return;
     let cardsHTML = `<div class="card-grid">`;
@@ -657,7 +707,7 @@ window.renderCards = (dataToRender) => {
         const combustibleDisplay = item.combustibleFraccion || 'N/A';
 
         // 🚨 CÓDIGO CORREGIDO: Usando JSON.stringify y decodeURIComponent para pasar el objeto
-        const itemDataString = JSON.stringify(item); // Definimos la variable dentro del bucle
+        const itemDataString = JSON.stringify(item); 
                 
         cardsHTML += `
             <div class="data-card ${cardClass}" data-index="${index}">
@@ -683,8 +733,10 @@ window.renderCards = (dataToRender) => {
 
 // Se mantiene showDetailsModal con corrección de color de capacitación
 const showDetailsModal = (item) => {
-    const isMovilCheck = currentSheet !== "Verificacion de objetivos MAC";
-    const isBaseCheck = currentSheet === "verificacion de bases";
+    // La lógica de chequeo se adapta si estamos en la pestaña consolidada (revisa HojaOrigen)
+    const isRecorridoCheck = currentSheet === "Recorridos_Consolidados";
+    const isBaseCheck = isRecorridoCheck ? (item.HojaOrigen === "verificacion de bases") : (currentSheet === "verificacion de bases");
+    const isMovilCheck = isRecorridoCheck ? (item.HojaOrigen !== "Verificacion de objetivos MAC" && item.HojaOrigen !== "verificacion de bases" && item.HojaOrigen !== "Verificacion de sitios Aysa") : (currentSheet !== "Verificacion de objetivos MAC" && currentSheet !== "Verificacion de sitios Aysa");
     
     let basesFaltas = []; 
 
@@ -713,6 +765,7 @@ const showDetailsModal = (item) => {
         <p><strong>Puesto/Base/Sitio:</strong> ${item.patrullaNombre || 'N/A'}</p>
         <p><strong>Supervisor:</strong> ${(item.emailSupervisor && typeof item.emailSupervisor === 'string' ? item.emailSupervisor : 'N/A')}</p>
         <p><strong>Fecha/Hora Chequeo:</strong> ${item.timestamp || 'N/A'}</p>
+        ${isRecorridoCheck ? `<p><strong>Origen del Chequeo:</strong> ${item.HojaOrigen.replace('Verificacion de ', '').replace('verificacion de ', '') || 'N/A'}</p>` : ''}
         <hr>
     `;
 
@@ -767,16 +820,17 @@ const showDetailsModal = (item) => {
             html += baseDetailsHtml;
         }
 
-    } else if (isMovilCheck) { // Baterías/Patrullas, Sitios Aysa
+    } else if (isMovilCheck) { // Baterías/Patrullas
         html += `
+            <h4>Información del Móvil/Puesto:</h4>
             <p><strong>Dominio/Móvil:</strong> ${item.movilDominio || 'N/A'}</p>
             <p><strong>Kilometraje:</strong> ${item.kilometraje || 'N/A'}</p>
             <p class="${item.combustibleFraccion && checkCombustible(item.combustibleFraccion).alerta ? 'text-danger' : ''}"><strong>Nivel de Combustible:</strong> ${item.combustibleFraccion || 'N/A'}</p>
             <p class="${getColorClass(item.higieneMovil)}"><strong>Higiene:</strong> ${item.higieneMovil || 'N/A'}</p>
             <p class="${getColorClass(item.poseeBotiquin)}"><strong>Posee Botiquín:</strong> ${item.poseeBotiquin || 'N/A'}</p>
         `;
-    } else { // Objetivos MAC (Puesto Fijo)
-        html += `<p>Dominio/Móvil: N/A - Puesto Fijo</p>`;
+    } else { // Objetivos MAC o Sitios AYSA (Puesto Fijo/Sitio)
+        html += `<h4>Información del Puesto:</h4><p>Dominio/Móvil: N/A - Puesto Fijo</p>`;
     }
 
     // 3. Observaciones Generales
@@ -849,7 +903,12 @@ const initialize = () => {
     if (searchInput) searchInput.addEventListener('input', window.filterAndSearch);
     if (alertFilter) alertFilter.addEventListener('change', window.filterAndSearch); 
     // Aseguramos que el redimensionamiento también use la función global
-    window.addEventListener('resize', () => { if (sheetData.length > 0) window.renderData(sheetData); }); 
+    window.addEventListener('resize', () => { 
+        // Solo renderiza la tabla/tarjeta si NO estamos en la pestaña de recorrido
+        if (sheetData.length > 0 && currentSheet !== "Recorridos_Consolidados") {
+             window.renderData(sheetData); 
+        }
+    }); 
 
     tabButtons.forEach(button => {
         button.addEventListener('click', (event) => {
@@ -862,7 +921,6 @@ const initialize = () => {
 
     // Configurar el selector de fecha y su listener
     if (recorridoDateSelector) {
-        // Obtenemos la fecha de hoy asegurando el formato YYYY-MM-DD (sin desfase)
         const today = new Date();
         const year = today.getFullYear();
         const month = String(today.getMonth() + 1).padStart(2, '0');
@@ -877,6 +935,7 @@ const initialize = () => {
             const rawDailyRecorrido = event.target.dataset.dailyRecorrido;
             
             if (activeSupervisor && rawDailyRecorrido) {
+                 // Recuperamos los datos agrupados que se guardaron al hacer clic en el supervisor
                  const dailyRecorrido = JSON.parse(rawDailyRecorrido);
                  const supervisorName = activeSupervisor.includes('@') ? activeSupervisor.split('@')[0] : activeSupervisor;
                  

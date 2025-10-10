@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard | Control de Flota y Personal</title>
-    <link rel="stylesheet" href="styles.css"> </head>
+    <link rel="stylesheet" href="styles.css"> 
+</head>
 <body>
     <header>
         <h1>Control de Flota y Personal | Dashboard MAC Seguridad</h1>
@@ -17,6 +18,7 @@
                 <button class="tab-button" data-sheet="Verificacion de objetivos MAC">Verificación MAC</button>
                 <button class="tab-button" data-sheet="Verificacion de sitios Aysa">Verificación AYSA</button>
                 <button class="tab-button" data-sheet="verificacion de bases">Verificación BASES</button>
+                <button class="tab-button" data-sheet="Recorridos_Consolidados">Recorridos Supervisores</button> 
             </div>
             
             <div class="filter-bar">
@@ -28,31 +30,26 @@
             </div>
         </section>
 
-        <div class="summary-section">
-    
-            <div class="recorrido-date-control">
-                <label for="recorridoDateSelector">Ver Recorrido en Fecha:</label>
-                <input type="date" id="recorridoDateSelector" class="form-control"> 
-            </div>
-    
-            <div id="supervisorSummary" class="supervisor-summary-list">
-            </div>
-
-            <div class="recorrido-detail-container">
-                <h2>Ruta de Chequeos del Supervisor</h2>
-                    <p id="recorridoInstructions">Selecciona un supervisor del sumario para ver su recorrido.</p>
-                <div id="recorridoContainer" class="recorrido-grid">
+        <section class="summary-section">
+            <div id="supervisorSummary">
                 </div>
-            </div>
-        </div>
 
-        <div class="data-table-section">
+            <div class="recorrido-details-container"> 
+                <div class="recorrido-controls">
+                    <div id="recorridoInstructions">
+                        </div>
+                    <input type="date" id="recorridoDateSelector" title="Seleccionar fecha del recorrido">
+                </div>
+                
+                <div id="recorridoContainer">
+                    </div>
             </div>
+        </section>
 
         <section class="data-display">
-            <h2>Resultados del Chequeo (<span id="countDisplay">0</span>)</h2>
+            <h2 id="resultsTitle">Resultados del Chequeo (<span id="countDisplay">0</span>)</h2>
             <div id="dataContainer" class="responsive-data">
-                </div>
+            </div>
         </section>
 
         <div id="detailsModal" class="modal">
@@ -68,5 +65,6 @@
         <p>&copy; 2025 MacSeguridad Control.</p>
     </footer>
 
-    <script src="script.js"></script> </body>
+    <script src="script.js"></script> 
+</body>
 </html>
