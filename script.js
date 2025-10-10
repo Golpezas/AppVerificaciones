@@ -450,8 +450,9 @@ const renderRecorridoForDate = (dayISO, supervisorName, dailyRecorrido) => {
                 <div class="item-details">
                     <span class="item-location"><strong>${displayLocation}</strong></span>
                 </div>
-                <button class="btn-detail" 
-                        onclick="event.stopPropagation(); showDetailsModal(JSON.parse(decodeURIComponent('${encodeURIComponent(checkDataString)}')))">
+                <button class="button-small recorrido-btn-detail" 
+                    data-check='${checkDataString.replace(/'/g, "\\'")}' 
+                    title="Ver detalle del chequeo">
                     ${isAlert ? '🚨 Ver Detalle' : '✅ Ver Detalle'}
                 </button>
             </li>
@@ -731,8 +732,8 @@ window.renderCards = (dataToRender) => {
     dataContainer.innerHTML = cardsHTML;
 };
 
-// Se mantiene showDetailsModal con corrección de color de capacitación
-const showDetailsModal = (item) => {
+// Hacemos la función global para que el Event Listener Delegado pueda encontrarla.
+window.showDetailsModal = (item) => {
     // La lógica de chequeo se adapta si estamos en la pestaña consolidada (revisa HojaOrigen)
     const isRecorridoCheck = currentSheet === "Recorridos_Consolidados";
     const isBaseCheck = isRecorridoCheck ? (item.HojaOrigen === "verificacion de bases") : (currentSheet === "verificacion de bases");
@@ -899,9 +900,43 @@ if (detailsModal) {
 // 6. INICIALIZACIÓN
 // ====================================================================================================
 
+/**
+ * Usa delegación de eventos para manejar clics en botones de detalle
+ * dentro del contenedor de recorrido (#recorridoContainer).
+ */
+
+const setupRecorridoDetailListener = () => {
+    // Asegúrate de que 'recorridoContainer' esté definido como variable global al inicio del script.
+    if (!recorridoContainer) return; 
+
+    recorridoContainer.addEventListener('click', (event) => {
+        // Busca el botón .button-small más cercano al elemento clickeado
+        const button = event.target.closest('.button-small');
+        
+        if (button && button.hasAttribute('data-check')) { // Verificamos que sea el botón de detalle del recorrido
+            event.stopPropagation();
+            
+            // Obtenemos el string JSON del atributo data-check
+            const checkDataString = button.dataset.check;
+            
+            try {
+                // Parseamos el string JSON a un objeto JavaScript
+                const itemData = JSON.parse(checkDataString);
+                
+                // Llamamos a la función showDetailsModal con el objeto completo
+                window.showDetailsModal(itemData);
+            } catch (e) {
+                console.error("Error al parsear datos del recorrido:", e);
+                alert("No se pudo cargar el detalle del chequeo. Verifique el formato JSON.");
+            }
+        }
+    });
+};
+
 const initialize = () => {
     if (searchInput) searchInput.addEventListener('input', window.filterAndSearch);
     if (alertFilter) alertFilter.addEventListener('change', window.filterAndSearch); 
+    
     // Aseguramos que el redimensionamiento también use la función global
     window.addEventListener('resize', () => { 
         // Solo renderiza la tabla/tarjeta si NO estamos en la pestaña de recorrido
@@ -935,15 +970,22 @@ const initialize = () => {
             const rawDailyRecorrido = event.target.dataset.dailyRecorrido;
             
             if (activeSupervisor && rawDailyRecorrido) {
-                 // Recuperamos los datos agrupados que se guardaron al hacer clic en el supervisor
-                 const dailyRecorrido = JSON.parse(rawDailyRecorrido);
-                 const supervisorName = activeSupervisor.includes('@') ? activeSupervisor.split('@')[0] : activeSupervisor;
-                 
-                 renderRecorridoForDate(selectedDate, supervisorName, dailyRecorrido);
+                // Recuperamos los datos agrupados que se guardaron al hacer clic en el supervisor
+                const dailyRecorrido = JSON.parse(rawDailyRecorrido);
+                const supervisorName = activeSupervisor.includes('@') ? activeSupervisor.split('@')[0] : activeSupervisor;
+                
+                renderRecorridoForDate(selectedDate, supervisorName, dailyRecorrido);
             }
         });
     }
 
+    // 🎯 CAMBIO CLAVE AÑADIDO: Inicializar el listener delegado para los botones "Ver Detalle"
+    if (typeof setupRecorridoDetailListener === 'function') {
+        setupRecorridoDetailListener(); 
+    } else {
+        console.error("Error: La función setupRecorridoDetailListener no está definida.");
+    }
+    
     // Carga Inicial
     const initialTab = document.querySelector(`.tab-button[data-sheet="${currentSheet}"]`);
     if (initialTab) {

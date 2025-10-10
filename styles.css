@@ -547,3 +547,37 @@ main {
         margin-top: -10px; 
     }
 }
+
+/* ========================================================== */
+/* CORRECCIÓN VISUAL PARA BOTÓN DE DETALLE EN EL TIMELINE */
+/* ========================================================== */
+
+.recorrido-item .button-small {
+    /* CRÍTICO: FUERZA al botón a ser SÓLO del ancho de su contenido. */
+    width: fit-content; 
+    
+    /* CRÍTICO: Impide que el botón se estire (flex-grow) o se encoja (flex-shrink)
+       dentro del contenedor flexible (.recorrido-item). */
+    flex-grow: 0;
+    flex-shrink: 0;
+    
+    /* Alinea el botón a la derecha (esto es correcto, ya que está después de los otros elementos flex) */
+    margin-left: auto; 
+    
+    /* Mantiene el contenido ajustado y centrado verticalmente */
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap; 
+    
+    /* Restaura el padding (si no usa el padding de .button-small global) */
+    padding: 8px 12px;
+}
+
+/* Estilos de Alerta (Se mantienen por consistencia) */
+.recorrido-item.item-alert .button-small {
+    background-color: var(--alert-color, #dc3545); /* Rojo */
+}
+
+.recorrido-item.item-alert .button-small:hover {
+    background-color: darkred;
+}
