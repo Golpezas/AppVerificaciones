@@ -105,7 +105,7 @@ main {
 /* AJUSTE CLAVE PARA DESKTOP (Fuera de cualquier media query) */
 .summary-section {
     /* CAMBIO: Usamos Grid para manejar el contenedor de análisis de ancho completo */
-    display: none; 
+    display: none !important; /* Se activa en media query para móvil */; 
     grid-template-columns: 1fr 2fr; /* Layout Supervisor (1) y Recorrido (2) */
     gap: 30px;
     margin-top: 25px;
