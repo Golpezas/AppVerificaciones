@@ -31,6 +31,13 @@
         </section>
 
         <section class="summary-section">
+            <div id="repetitionAnalysisContainer" class="analysis-box" style="display: none;">
+                <h4>Análisis de Chequeos Duplicados</h4>
+                <p>Se encontraron <span id="repetitionCount">0</span> días con objetivos visitados por múltiples supervisores en la misma fecha.</p>
+                <button id="toggleRepetitionsBtn" class="button-small" onclick="window.toggleRepetitionDetails()">Ver Detalles</button>
+                <div id="repetitionResults">
+                    </div>
+            </div>
             <div id="supervisorSummary">
                 </div>
 
@@ -40,7 +47,7 @@
                         </div>
                     <input type="date" id="recorridoDateSelector" title="Seleccionar fecha del recorrido">
                 </div>
-                
+        
                 <div id="recorridoContainer">
                     </div>
             </div>

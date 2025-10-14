@@ -102,17 +102,66 @@ main {
 /* 🚨 NUEVOS ESTILOS PARA RECORRIDOS_CONSOLIDADOS (SUMMARY/RECORRIDO) */
 /* ========================================================== */
 
+/* AJUSTE CLAVE PARA DESKTOP (Fuera de cualquier media query) */
 .summary-section {
-    /* Controlado por JS, será 'flex' para esta pestaña, por defecto 'none' */
+    /* CAMBIO: Usamos Grid para manejar el contenedor de análisis de ancho completo */
     display: none; 
+    grid-template-columns: 1fr 2fr; /* Layout Supervisor (1) y Recorrido (2) */
     gap: 30px;
     margin-top: 25px;
     padding: 0 10px;
 }
 
+/* Regla para que el contenedor de análisis ocupe todo el ancho en desktop */
+#repetitionAnalysisContainer {
+    grid-column: 1 / -1; /* Ocupa de la primera a la última columna */
+    padding: 15px 20px;
+    margin-bottom: 20px;
+    border-radius: 10px;
+    background-color: #ffe0e0; /* Fondo de alerta suave */
+    border: 2px solid var(--alert-color);
+    box-shadow: 0 4px 10px rgba(220, 53, 69, 0.15);
+}
+
+#repetitionAnalysisContainer h4 {
+    color: var(--alert-color);
+    margin-bottom: 5px;
+    border-bottom: none;
+}
+
+#repetitionAnalysisContainer p {
+    margin-bottom: 10px;
+}
+
+#repetitionAnalysisContainer .button-small {
+    background-color: var(--alert-color);
+    margin-bottom: 10px;
+}
+
+#repetitionAnalysisContainer .button-small:hover {
+    background-color: darkred;
+}
+
+#repetitionDetails .card {
+    border: 1px solid #ffbbbb;
+}
+
+#repetitionDetails h6 {
+    color: #333;
+    font-size: 1em;
+}
+
+#repetitionDetails .list-group-item-danger {
+    padding: 8px 12px;
+    margin-bottom: 4px;
+    border-radius: 5px;
+    font-size: 0.9em;
+}
+
+
 /* 1. Sumario de Supervisores */
 #supervisorSummary {
-    flex: 1; 
+    /* 'flex: 1' se reemplaza efectivamente con 'grid-column: 1' en el nuevo layout */
     min-width: 300px;
     padding: 20px;
     background-color: var(--card-bg);
@@ -175,7 +224,7 @@ main {
 
 /* 2. Controles de Fecha y Recorrido */
 .recorrido-details-container {
-    flex: 2;
+    /* 'flex: 2' se reemplaza efectivamente con 'grid-column: 2' en el nuevo layout */
     min-width: 400px;
 }
 
@@ -499,9 +548,16 @@ main {
 @media (max-width: 768px) {
     
     .summary-section {
-        flex-direction: column;
+        /* CAMBIO CLAVE: Usamos Grid con una sola columna para apilar Análisis, Sumario y Recorrido */
+        display: grid !important; 
+        grid-template-columns: 1fr; /* Una sola columna en móvil */
         gap: 20px;
         padding: 0 5px;
+    }
+
+    /* Aseguramos que el contenedor de análisis se anule para móvil y ocupe el espacio de una columna */
+    #repetitionAnalysisContainer {
+        grid-column: auto; 
     }
 
     #supervisorSummary {
@@ -557,7 +613,7 @@ main {
     width: fit-content; 
     
     /* CRÍTICO: Impide que el botón se estire (flex-grow) o se encoja (flex-shrink)
-       dentro del contenedor flexible (.recorrido-item). */
+        dentro del contenedor flexible (.recorrido-item). */
     flex-grow: 0;
     flex-shrink: 0;
     

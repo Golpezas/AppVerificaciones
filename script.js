@@ -30,6 +30,125 @@ const dataDisplaySection = document.querySelector('.data-display');
 // Variables de estado del recorrido
 let activeSupervisorEmail = null;
 
+// ====================================================================================================
+// 1.5. DATA Y LÓGICA DE ANÁLISIS DE REPETICIONES
+// ====================================================================================================
+
+// Variable global para almacenar el resultado del análisis
+let repeatedChecksAnalysis = {}; 
+
+/**
+ * Analiza el objeto agrupado por supervisor/día para encontrar objetivos visitados
+ * por más de un supervisor el mismo día.
+ * @param {object} allRecorridoData - El objeto agrupado por emailSupervisor y día.
+ */
+const analyzeRepeatedChecks = (allRecorridoData) => {
+    const repeatsByDate = {}; // { 'YYYY-MM-DD': { 'Objetivo A': [sup1@, sup2@], ... } }
+
+    Object.keys(allRecorridoData).forEach(emailSupervisor => {
+        const checkData = allRecorridoData[emailSupervisor];
+
+        Object.keys(checkData).forEach(dayISO => {
+            if (!repeatsByDate[dayISO]) {
+                repeatsByDate[dayISO] = {};
+            }
+
+            // Agrupamos por el nombre de la ubicación para contar supervisores
+            checkData[dayISO].forEach(check => {
+                const objective = check.patrullaNombre; 
+                if (!objective) return;
+
+                if (!repeatsByDate[dayISO][objective]) {
+                    repeatsByDate[dayISO][objective] = new Set();
+                }
+                repeatsByDate[dayISO][objective].add(emailSupervisor);
+            });
+        });
+    });
+
+    // Filtramos solo las entradas con más de un supervisor
+    const finalRepeats = {};
+    Object.keys(repeatsByDate).forEach(dayISO => {
+        finalRepeats[dayISO] = {};
+        Object.keys(repeatsByDate[dayISO]).forEach(objective => {
+            const supervisors = Array.from(repeatsByDate[dayISO][objective]);
+            
+            if (supervisors.length > 1) {
+                // Limpiar el email a solo el nombre para el display
+                finalRepeats[dayISO][objective] = supervisors.map(email => email.split('@')[0]); 
+            }
+        });
+
+        if (Object.keys(finalRepeats[dayISO]).length > 0) {
+            finalRepeats[dayISO] = finalRepeats[dayISO]; // Solo se guarda si tiene repeticiones
+        }
+    });
+
+    return finalRepeats;
+};
+
+/**
+ * Renderiza los resultados del análisis de repeticiones en el DOM.
+ */
+const renderRepetitionAnalysis = (analysisData) => {
+    // Asegúrate de definir esta variable globalmente en la sección 1 (DATA Y CONFIGURACIÓN CRÍTICA)
+    const container = document.getElementById('repetitionAnalysisContainer');
+    const resultsDiv = document.getElementById('repetitionResults');
+    const countSpan = document.getElementById('repetitionCount');
+    const toggleButton = document.getElementById('toggleRepetitionsBtn');
+
+    if (!container || !resultsDiv) return;
+
+    const daysWithRepeats = Object.keys(analysisData).length;
+    countSpan.textContent = daysWithRepeats;
+
+    if (daysWithRepeats === 0) {
+        container.style.display = 'none';
+        return;
+    }
+
+    container.style.display = 'block';
+    
+    // Inicialmente oculto
+    let detailsHtml = '<div id="repetitionDetails" style="display: none;">';
+
+    Object.keys(analysisData).sort().reverse().forEach(dayISO => {
+        const objectives = analysisData[dayISO];
+        const dateDisplay = new Date(dayISO + 'T00:00:00').toLocaleDateString(); // Evita problemas de zona horaria
+
+        detailsHtml += `<div class="card p-2 mt-2">
+            <h6>📅 ${dateDisplay} (${Object.keys(objectives).length} objetivos repetidos)</h6>
+            <ul class="list-group list-group-flush mt-1">`;
+        
+        Object.keys(objectives).forEach(objective => {
+            const supervisors = objectives[objective].join(', ');
+            detailsHtml += `<li class="list-group-item d-flex justify-content-between align-items-center text-danger list-group-item-danger">
+                <span>📍 <strong>${objective}</strong></span>
+                <span class="badge bg-danger text-white">Supervisores: ${supervisors}</span>
+            </li>`;
+        });
+        
+        detailsHtml += `</ul></div>`;
+    });
+
+    detailsHtml += '</div>';
+    resultsDiv.innerHTML = detailsHtml;
+
+    // Aseguramos que el estado del botón refleje que los detalles están ocultos inicialmente
+    toggleButton.textContent = 'Ver Detalles';
+};
+
+// Función global para mostrar/ocultar los detalles de repetición
+window.toggleRepetitionDetails = () => {
+    const details = document.getElementById('repetitionDetails');
+    const button = document.getElementById('toggleRepetitionsBtn');
+    
+    if (!details || !button) return;
+    
+    const isVisible = details.style.display !== 'none';
+    details.style.display = isVisible ? 'none' : 'block';
+    button.textContent = isVisible ? 'Ver Detalles' : 'Ocultar Detalles';
+};
 
 // ====================================================================================================
 // 2. FUNCIONES DE CARGA Y ORDENAMIENTO
@@ -140,8 +259,20 @@ const loadData = async (sheetName) => {
         if (!isRecorridoTab) {
             sheetData = checkInactivity(sheetData); 
             window.filterAndSearch(); 
+        
+            // **IMPORTANTE**: Ocultar el análisis al cambiar a otra pestaña
+            const analysisContainer = document.getElementById('repetitionAnalysisContainer');
+            if(analysisContainer) analysisContainer.style.display = 'none';
+
         } else {
-            updateSummaryData(sheetData);
+            // Ejecutar el sumario y obtener los datos agrupados por supervisor y día
+            const allRecorridoData = updateSummaryData(sheetData);
+        
+            // 🎯 1.B: EJECUTAR EL ANÁLISIS DE REPETICIONES
+            repeatedChecksAnalysis = analyzeRepeatedChecks(allRecorridoData);
+
+            // 🎯 1.B: RENDERIZAR LA SECCIÓN DEL ANÁLISIS
+            renderRepetitionAnalysis(repeatedChecksAnalysis);
         }
         
     } catch (error) {
@@ -277,59 +408,86 @@ const checkInactivity = (data) => {
 
 /**
  * Renderiza el sumario de supervisores para la pestaña consolidada.
+ * Además, agrupa los datos por supervisor y día y los retorna para el análisis de repeticiones.
+ * @returns {object} allRecorridoData - Datos agrupados por emailSupervisor y luego por día (ISO).
  */
 const updateSummaryData = (data) => {
-    const supervisorCounts = data.reduce((acc, item) => {
+    const supervisorCounts = {};
+    const allRecorridoData = {}; // Nuevo objeto para agrupar por supervisor Y día
+
+    data.forEach(item => {
         const email = item.emailSupervisor;
         if (email && email.trim() !== '') {
             const key = email.trim().toLowerCase();
-            if (!acc[key]) {
-                acc[key] = {
-                    count: 0,
-                    lastCheck: item.timestamp 
-                };
+            const sortValue = getDateSortValue(item.timestamp);
+            
+            if (!supervisorCounts[key]) {
+                supervisorCounts[key] = { count: 0, lastCheck: item.timestamp };
             }
-            acc[key].count++;
+            supervisorCounts[key].count++;
+
             // Mantiene el timestamp más reciente
-            if (getDateSortValue(item.timestamp) > getDateSortValue(acc[key].lastCheck)) {
-                 acc[key].lastCheck = item.timestamp;
+            if (sortValue > getDateSortValue(supervisorCounts[key].lastCheck)) {
+                 supervisorCounts[key].lastCheck = item.timestamp;
             }
+
+            // --- LÓGICA DE AGRUPACIÓN POR DÍA (Para Recorridos y Análisis de Repeticiones) ---
+            if (sortValue !== 0) {
+                const dateObj = new Date(sortValue);
+                const year = dateObj.getFullYear();
+                const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                const day = String(dateObj.getDate()).padStart(2, '0');
+                const dayKey = `${year}-${month}-${day}`; 
+
+                if (!allRecorridoData[key]) {
+                    allRecorridoData[key] = {};
+                }
+                if (!allRecorridoData[key][dayKey]) {
+                    allRecorridoData[key][dayKey] = [];
+                }
+                allRecorridoData[key][dayKey].push(item);
+            }
+            // ---------------------------------------------------------------------------------
         }
-        return acc;
-    }, {});
+    });
 
     let html = '<h4>Supervisores y Cantidad de Chequeos Consolidados:</h4>';
     const sortedSupervisors = Object.entries(supervisorCounts).sort(([, a], [, b]) => b.count - a.count);
 
     if (sortedSupervisors.length === 0) {
+        // ... (Tu lógica de limpieza actual) ...
         html += '<p class="text-info">No se encontraron chequeos para supervisores.</p>';
         supervisorSummary.innerHTML = html;
-        // Limpiar controles de recorrido si no hay datos
         if (recorridoContainer) recorridoContainer.innerHTML = '';
         if (recorridoInstructions) recorridoInstructions.textContent = 'No hay datos para mostrar.';
-        return;
+        return allRecorridoData; // **RETORNO DE DATOS**
     }
+
+    // ... (Tu código de renderizado del HTML del sumario actual) ...
+    // Nota: El HTML de los supervisores no cambia, solo la parte de acumulación de datos.
 
     html += '<ul class="supervisor-list">';
     sortedSupervisors.forEach(([email, details]) => {
-        const name = email.split('@')[0]; // Usa la parte antes del @ como nombre visible
-        
-        // Formato para mostrar la fecha: solo fecha, no hora
+        // ... (Tu código para generar los <li>) ...
+        const name = email.split('@')[0];
         const lastDateDisplay = details.lastCheck ? details.lastCheck.split(',')[0].trim() : 'N/A';
         const isAlert = data.filter(item => item.emailSupervisor && item.emailSupervisor.toLowerCase() === email && hasAlert(item)).length > 0;
         
         html += `
-            <li data-email="${email}" onclick="window.showSupervisorRecorrido('${email}')" 
-                title="Ver recorrido de ${name}"
-                class="${isAlert ? 'list-alert' : ''}">
-                <strong>${name} ${isAlert ? '🚨' : ''}</strong>
-                <span>Chequeos: ${details.count}</span>
-                <span class="small-text">Último: ${lastDateDisplay}</span>
-            </li>
-        `;
+             <li data-email="${email}" onclick="window.showSupervisorRecorrido('${email}')" 
+                 title="Ver recorrido de ${name}"
+                 class="${isAlert ? 'list-alert' : ''}">
+                 <strong>${name} ${isAlert ? '🚨' : ''}</strong>
+                 <span>Chequeos: ${details.count}</span>
+                 <span class="small-text">Último: ${lastDateDisplay}</span>
+             </li>
+         `;
     });
+
     html += '</ul>';
     supervisorSummary.innerHTML = html;
+    
+    return allRecorridoData; // **RETORNO DE DATOS CLAVE PARA EL ANÁLISIS**
 };
 
 
