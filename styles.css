@@ -105,7 +105,7 @@ main {
 /* AJUSTE CLAVE PARA DESKTOP (Fuera de cualquier media query) */
 .summary-section {
     display: none; 
-        
+
     /* ELIMINADAS: grid-template-columns, gap, y padding (lo gestionará el JS como flex) */
     /* Dejamos solo las propiedades de margen y padding si son esenciales para el espaciado general */
     margin-top: 25px;
@@ -573,8 +573,10 @@ main {
 @media (max-width: 768px) {
     
     .summary-section {
-        /* CAMBIO CLAVE: Usamos Grid con una sola columna para apilar Análisis, Sumario y Recorrido */
-        display: grid !important; 
+        /* ✅ ELIMINAMOS: display: grid !important; */
+        
+        /* Mantenemos las reglas de layout para cuando JS lo muestre (display: flex/grid) */
+        /* CAMBIO CLAVE: Quitamos la propiedad display, dejamos que JS lo maneje */
         grid-template-columns: 1fr; /* Una sola columna en móvil */
         gap: 20px;
         padding: 0 5px;
