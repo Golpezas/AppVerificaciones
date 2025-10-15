@@ -212,7 +212,13 @@ const loadData = async (sheetName) => {
     if (summarySection) {
         const newDisplay = isRecorridoTab ? 'flex' : 'none';
         summarySection.style.display = newDisplay;
-        if (isRecorridoTab) summarySection.style.flexDirection = 'column'; // Lo mantiene apilado
+    
+        if (isRecorridoTab) {
+            // 🎯 CAMBIO CRÍTICO: Aplicar 'row' para layout de dos columnas en desktop (>900px)
+            // y 'column' para móvil/tablet.
+            const flexDir = (window.innerWidth > 900) ? 'row' : 'column';
+            summarySection.style.flexDirection = flexDir; 
+        }
 
         console.log(`VISIBILITY LOG: summarySection display set to: ${newDisplay}`);
     }

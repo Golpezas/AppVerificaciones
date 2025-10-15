@@ -104,10 +104,16 @@ main {
 
 /* AJUSTE CLAVE PARA DESKTOP (Fuera de cualquier media query) */
 .summary-section {
-    display: none; 
+    display: none; /* Mantenemos 'none' para que JS controle la visibilidad */
 
-    /* ELIMINADAS: grid-template-columns, gap, y padding (lo gestionará el JS como flex) */
-    /* Dejamos solo las propiedades de margen y padding si son esenciales para el espaciado general */
+    /* 🎯 NUEVOS ESTILOS BASE PARA EL LAYOUT DE 2 COLUMNAS EN ESCRITORIO */
+    /* Cuando JS lo pone a display: flex, estas propiedades definen el layout de fila */
+    flex-direction: row; 
+    flex-wrap: wrap; /* Permitir que los hijos se envuelvan (para el análisis de ancho completo) */
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 30px; /* Separación entre el sumario y el detalle */
+    
     margin-top: 25px;
     padding: 0 10px;
 }
@@ -121,7 +127,10 @@ main {
 
 /* Regla para que el contenedor de análisis ocupe todo el ancho en desktop */
 #repetitionAnalysisContainer {
-    grid-column: 1 / -1; /* Ocupa de la primera a la última columna */
+    /* 🛑 REEMPLAZAR grid-column por width: 100% para Flexbox */
+    width: 100%; 
+    order: 1; /* Aseguramos que sea el primer elemento */
+    
     padding: 15px 20px;
     margin-bottom: 20px;
     border-radius: 10px;
@@ -168,13 +177,18 @@ main {
 
 /* 1. Sumario de Supervisores */
 #supervisorSummary {
-    /* 'flex: 1' se reemplaza efectivamente con 'grid-column: 1' en el nuevo layout */
-    min-width: 300px;
+    /* 🎯 CAMBIO CRÍTICO: Aumentamos el ancho base a 400px */
+    flex: 0 0 400px; /* No crece (0), no se encoge (0), base de 400px */
+    order: 2;
+    min-width: 400px; /* Aseguramos que no se achique más de 400px */
+    
     padding: 20px;
     background-color: var(--card-bg);
     border-radius: 10px;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-    max-height: 60vh; 
+    
+    /* Mantenemos la altura máxima que ya tenías o la ajustamos si es necesario */
+    max-height: 75vh; 
     overflow-y: auto;
 }
 
@@ -231,8 +245,10 @@ main {
 
 /* 2. Controles de Fecha y Recorrido */
 .recorrido-details-container {
-    /* 'flex: 2' se reemplaza efectivamente con 'grid-column: 2' en el nuevo layout */
-    min-width: 400px;
+    flex: 1 1 auto; /* OK: Crece para ocupar el espacio restante */
+    order: 3;
+    /* Mantenemos un min-width que permita la visualización de la línea de tiempo. */
+    min-width: 350px; 
 }
 
 .recorrido-controls {
