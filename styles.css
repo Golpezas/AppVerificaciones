@@ -104,12 +104,20 @@ main {
 
 /* AJUSTE CLAVE PARA DESKTOP (Fuera de cualquier media query) */
 .summary-section {
-    /* CAMBIO: Usamos Grid para manejar el contenedor de análisis de ancho completo */
+    /* MANTIENE: Ocultamiento forzado al inicio */
     display: none !important; 
-    grid-template-columns: 1fr 2fr; /* Layout Supervisor (1) y Recorrido (2) */
-    gap: 30px;
+    
+    /* ELIMINADAS: grid-template-columns, gap, y padding (lo gestionará el JS como flex) */
+    /* Dejamos solo las propiedades de margen y padding si son esenciales para el espaciado general */
     margin-top: 25px;
     padding: 0 10px;
+}
+
+.main-content {
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+    margin-top: 20px;
 }
 
 /* Regla para que el contenedor de análisis ocupe todo el ancho en desktop */

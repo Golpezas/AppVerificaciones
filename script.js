@@ -207,7 +207,8 @@ const loadData = async (sheetName) => {
     const isRecorridoTab = sheetName === "Recorridos_Consolidados";
 
     // 🚨 CONTROL DE VISIBILIDAD CRÍTICO (Ajuste para móvil/desktop)
-    if (summarySection) summarySection.style.display = isRecorridoTab ? 'grid' : 'none'; // Usamos 'grid' para mantener el layout.
+    if (summarySection) summarySection.style.display = isRecorridoTab ? 'flex' : 'none';
+    if (isRecorridoTab) summarySection.style.flexDirection = 'column';
     if (dataDisplaySection) dataDisplaySection.style.display = isRecorridoTab ? 'none' : 'block';
 
     // Oculta/Muestra los filtros estándar
