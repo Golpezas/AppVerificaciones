@@ -206,10 +206,22 @@ const loadData = async (sheetName) => {
     currentSheet = sheetName;
     const isRecorridoTab = sheetName === "Recorridos_Consolidados";
 
+    console.log(`LOAD DATA: Pestaña cargada: ${sheetName}. Es Recorrido? ${isRecorridoTab}`);
+
     // 🚨 CONTROL DE VISIBILIDAD CRÍTICO (Ajuste para móvil/desktop)
-    if (summarySection) summarySection.style.display = isRecorridoTab ? 'flex' : 'none';
-    if (isRecorridoTab) summarySection.style.flexDirection = 'column';
-    if (dataDisplaySection) dataDisplaySection.style.display = isRecorridoTab ? 'none' : 'block';
+    if (summarySection) {
+        const newDisplay = isRecorridoTab ? 'flex' : 'none';
+        summarySection.style.display = newDisplay;
+        if (isRecorridoTab) summarySection.style.flexDirection = 'column'; // Lo mantiene apilado
+
+        console.log(`VISIBILITY LOG: summarySection display set to: ${newDisplay}`);
+    }
+    
+    if (dataDisplaySection) {
+        const newDisplay = isRecorridoTab ? 'none' : 'block';
+        dataDisplaySection.style.display = newDisplay;
+        console.log(`VISIBILITY LOG: dataDisplaySection display set to: ${newDisplay}`);
+    }
 
     // Oculta/Muestra los filtros estándar
     if (searchInput) searchInput.style.display = isRecorridoTab ? 'none' : 'block';
@@ -1089,13 +1101,20 @@ const setupRecorridoDetailListener = () => {
 const initialize = () => {
     // ⚠️ CRÍTICO: OCULTAR LA SECCIÓN DE RECORRIDO/SUMARIO AL INICIO
     // Esto evita que se vea un "flash" de contenido irrelevante antes de que loadData decida qué mostrar.
+    console.log("APP INIT: Verificando estado inicial de summary-section.");
     if (summarySection) {
-        summarySection.style.display = 'none';
+        // 1. Ocultar el contenedor padre (esto oculta a los hijos: análisis, sumario, recorrido)
+        summarySection.style.display = 'none'; 
+        console.log(`INIT STATUS: summarySection visibility set to: ${summarySection.style.display}`);
+    } else {
+        console.error("ERROR: No se encontró el elemento .summary-section.");
     }
+
+    // 2. Ocultar el contenedor de Análisis de Repeticiones. 
+    // Aunque el padre lo oculta, mantenemos esta línea para asegurar que si el padre se muestra por error, el análisis (que solo es visible después de cargar el supervisor) permanezca oculto.
     if (repetitionAnalysisContainer) {
         repetitionAnalysisContainer.style.display = 'none';
     }
-
 
     if (searchInput) searchInput.addEventListener('input', window.filterAndSearch);
     if (alertFilter) alertFilter.addEventListener('change', window.filterAndSearch);

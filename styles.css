@@ -105,7 +105,7 @@ main {
 /* AJUSTE CLAVE PARA DESKTOP (Fuera de cualquier media query) */
 .summary-section {
     display: none; 
-    
+        
     /* ELIMINADAS: grid-template-columns, gap, y padding (lo gestionará el JS como flex) */
     /* Dejamos solo las propiedades de margen y padding si son esenciales para el espaciado general */
     margin-top: 25px;
