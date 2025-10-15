@@ -105,7 +105,7 @@ main {
 /* AJUSTE CLAVE PARA DESKTOP (Fuera de cualquier media query) */
 .summary-section {
     /* CAMBIO: Usamos Grid para manejar el contenedor de análisis de ancho completo */
-    display: none; 
+    display: none !important; 
     grid-template-columns: 1fr 2fr; /* Layout Supervisor (1) y Recorrido (2) */
     gap: 30px;
     margin-top: 25px;
@@ -531,14 +531,32 @@ main {
     }
 }
 
-/* Ocultar tabla en móvil */
+/* Ajustes para pantallas pequeñas (móvil/tablet) */
 @media (max-width: 900px) {
+    /* 1. APILAR LAS COLUMNAS PRINCIPALES */
+    .main-content {
+        flex-direction: column;
+    }
+
+    /* 2. ASEGURAR QUE LAS COLUMNAS OCUPEN TODO EL ANCHO */
+    /* La sección de Recorrido/Supervisores se muestra u oculta con JS */
+    .summary-section,
+    .data-display {
+        width: 100%;
+        min-width: auto;
+    }
+
+    /* 3. OCULTAR LA TABLA (Muestra Tarjetas en su lugar) */
     .data-table {
         display: none; 
     }
+    
+    /* 4. APILAR LOS FILTROS */
     .filter-bar {
         flex-direction: column;
     }
+    
+    /* 5. HACER QUE LOS INPUTS OCUPEN TODO EL ANCHO */
     #searchInput, #alertFilter {
         min-width: 100%;
     }
